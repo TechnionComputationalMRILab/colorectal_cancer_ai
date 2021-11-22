@@ -12,5 +12,6 @@ pytorch-lightning
 
 ## How To's
 
-## Nice Notes
+# Nice Notes/Links
+- `Nature of Planned Research Doc (pre-pre-proposal)`: https://www.overleaf.com/2547568568nddqwpkspwrc
 
