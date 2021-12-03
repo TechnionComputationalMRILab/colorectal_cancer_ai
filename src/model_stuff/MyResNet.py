@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 
 from pytorch_lightning import LightningModule, Trainer
 import torchvision.models as models
-#from pl_bolts.callbacks import ORTCallback
 import torchmetrics
 
 from ..data_stuff import dataset_tools
@@ -37,7 +36,7 @@ class MyResNet(LightningModule):
         out = self(x)
 
         loss = self.criteria(out, torch.nn.functional.one_hot(y, num_classes=2).float())
-        acc = torchmetrics.functional.accuracy(out, y)
+        acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         
         self.patient_eval(path, out, y, 'train')
         self.log('train_loss', loss)
@@ -51,7 +50,7 @@ class MyResNet(LightningModule):
 
         
         val_loss = self.criteria(out, torch.nn.functional.one_hot(y, num_classes=2).float())
-        val_acc = torchmetrics.functional.accuracy(out, y)
+        val_acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         
         self.patient_eval(path, out, y, 'val')
         self.log('val_loss', val_loss)
@@ -80,7 +79,7 @@ class MyResNet(LightningModule):
             train_patient_scores = torch.stack(train_patient_scores)
             train_patient_targets = torch.stack(train_patient_targets)
             train_loss = self.criteria(train_patient_scores, torch.nn.functional.one_hot(train_patient_targets, num_classes=2).float())
-            train_acc = torchmetrics.functional.accuracy(train_patient_scores, train_patient_targets)
+            train_acc = torchmetrics.functional.accuracy(torch.argmax(train_patient_scores, dim=1), train_patient_targets)
             self.log('train_patientlvl_loss', train_loss)
             self.log('train_patientlvl_acc', train_acc)
 
@@ -97,7 +96,7 @@ class MyResNet(LightningModule):
             val_patient_scores = torch.stack(val_patient_scores)
             val_patient_targets = torch.stack(val_patient_targets)
             val_loss = self.criteria(val_patient_scores, torch.nn.functional.one_hot(val_patient_targets, num_classes=2).float())
-            val_acc = torchmetrics.functional.accuracy(val_patient_scores, val_patient_targets)
+            val_acc = torchmetrics.functional.accuracy(torch.argmax(val_patient_scores, dim=1), val_patient_targets)
             self.log('val_patientlvl_loss', val_loss)
             self.log('val_patientlvl_acc', val_acc)
 
