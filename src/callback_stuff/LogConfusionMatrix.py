@@ -11,9 +11,10 @@ import io
 import cv2
 
 class LogConfusionMatrix(pl.Callback):
-    def __init__(self, num_classes=2) -> None:
+    def __init__(self, class_to_idx) -> None:
         print("Logging Confusion Mat initialized")
-        self.num_classes = num_classes
+        self.num_classes = len(class_to_idx)
+        self.class_to_idx = class_to_idx
         self.train_dict = {"preds": [], "gt": []}
         self.val_dict = {"preds": [], "gt": []}
 
@@ -65,11 +66,11 @@ class LogConfusionMatrix(pl.Callback):
 
     def make_conf_matrix_image(self, conf_mat):
         df_cm = pd.DataFrame(conf_mat.tolist(), 
-                index = [i for i in range(self.num_classes)], 
-                columns = [i for i in range(self.num_classes)])
+                index = [i for i in self.class_to_idx.keys()], 
+                columns = [i for i in self.class_to_idx.keys()]).astype(int)
         fig, ax = plt.subplots()
         # fig.canvas.draw()
-        conf_mat_image = sns.heatmap(df_cm, annot=True, ax=ax);
+        conf_mat_image = sns.heatmap(df_cm, annot=True, ax=ax, fmt='.4g');
 
         # need to convert conf_mat_image (AxesSubplot object) to np array (image) for logging
         conf_mat_image = self.get_img_from_fig(fig)
