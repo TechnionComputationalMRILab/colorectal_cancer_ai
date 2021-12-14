@@ -17,13 +17,17 @@ class MySwinTransformer(LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model = timm.create_model("swin_tiny_patch4_window7_224", num_classes=self.hparams.num_classes)
-        self.criteria = torch.nn.BCEWithLogitsLoss()
-        # self.criteria = torch.nn.BCELoss()
+        self.model = timm.create_model("swin_tiny_patch4_window7_224", num_classes=0, pretrained=True, in_chans=3)
+        num_features = self.model.num_features
+        self.fc = torch.nn.Sequential(torch.nn.Dropout(0.1), torch.nn.Linear(num_features, self.hparams.num_classes), torch.nn.Sigmoid())
+        # self.criteria = torch.nn.BCEWithLogitsLoss()
+        self.criteria = torch.nn.BCELoss()
 
         
     def forward(self, x):
-        return self.model(x)
+        f = self.model(x)
+        out = self.fc(f)
+        return out
         
     def training_step(self, batch, batch_idx):
         path, x, y = batch
@@ -52,5 +56,5 @@ class MySwinTransformer(LightningModule):
     
                 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
+        return torch.optim.Adam(self.parameters(), lr=1e-5)
     
