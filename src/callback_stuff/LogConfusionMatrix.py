@@ -70,7 +70,7 @@ class LogConfusionMatrix(pl.Callback):
                 columns = [i for i in self.class_to_idx.keys()]).astype(int)
         fig, ax = plt.subplots()
         # fig.canvas.draw()
-        conf_mat_image = sns.heatmap(df_cm, annot=True, ax=ax, fmt='.4g');
+        conf_mat_image = sns.heatmap(df_cm, annot=True, ax=ax, fmt='.6g');
 
         # need to convert conf_mat_image (AxesSubplot object) to np array (image) for logging
         conf_mat_image = self.get_img_from_fig(fig)

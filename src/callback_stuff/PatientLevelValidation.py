@@ -69,8 +69,8 @@ class PatientLevelValidation(pl.Callback):
             train_patient_targets = []
             for patient in self.train_patient_eval_dict.keys():
                 train_patient_score = sum(self.train_patient_eval_dict[patient])/len(self.train_patient_eval_dict[patient])
-                train_patient_score = torch.tensor(train_patient_score)
-                train_patient_target = torch.tensor(self.all_patient_targets[patient])
+                train_patient_score = train_patient_score.clone().detach()
+                train_patient_target = self.all_patient_targets[patient].clone().detach()
                 train_patient_scores.append(train_patient_score)
                 train_patient_targets.append(train_patient_target)
             
@@ -86,8 +86,8 @@ class PatientLevelValidation(pl.Callback):
             val_patient_targets = []
             for patient in self.val_patient_eval_dict.keys():
                 val_patient_score = sum(self.val_patient_eval_dict[patient])/len(self.val_patient_eval_dict[patient])
-                val_patient_score = torch.tensor(val_patient_score)
-                val_patient_target = torch.tensor(self.all_patient_targets[patient])
+                val_patient_score = val_patient_score.clone().detach()
+                val_patient_target = self.all_patient_targets[patient].clone().detach()
                 val_patient_scores.append(val_patient_score)
                 val_patient_targets.append(val_patient_target)
 

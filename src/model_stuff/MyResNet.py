@@ -38,7 +38,7 @@ class MyResNet(LightningModule):
         self.log('train_loss', loss)
         self.log('train_acc', acc)
         loss = loss.unsqueeze(dim=-1)
-        return {"loss": loss, "acc": acc, "batch_outputs": out}
+        return {"loss": loss, "acc": acc, "batch_outputs": out.clone().detach()}
 
     def validation_step(self, batch, batch_idx):
         path, x, y = batch
@@ -51,7 +51,7 @@ class MyResNet(LightningModule):
         self.log('val_loss', val_loss)
         self.log('val_acc', val_acc)
         val_loss = val_loss.unsqueeze(dim=-1)
-        return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out}
+        return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out.clone().detach()}
     
                 
     def configure_optimizers(self):
