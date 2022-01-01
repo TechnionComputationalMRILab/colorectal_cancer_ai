@@ -8,6 +8,14 @@ TEST_DIR = ROOT_DIR + 'test'
 clinical_atlas_path = ROOT_DIR + 'clinical_Atlas.csv'
 data_table_colorectal_adenocarcinoma_path = ROOT_DIR + 'data_table_Colorectal_Adenocarcinoma.csv'
 
+def get_patient_name_from_path(path:str):
+    path_pattern = r'TCGA-\w{2}-\w{4}'
+    # Matches look like: ['TCGA-AZ-5403']
+    patient_name = re.findall(path_pattern, path)
+    assert(len(patient_name) == 1), "🛑 more than 1 patient name found"
+    return patient_name[0]
+    
+
 def get_dfs():
     """ returns atlas_df and adeno_df """
 

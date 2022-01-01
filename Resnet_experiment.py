@@ -5,7 +5,7 @@ install(["pytorch-lightning", "seaborn", "timm"], quietly=True)
 import torch
 from pytorch_lightning import Trainer
 # MY local imports
-from src.callback_stuff import LogConfusionMatrix, PatientLevelValidation
+from src.callback_stuff import LogConfusionMatrix, PatientLevelValidation, DownstreamTrainer
 from src.data_stuff import tcga_datamodules
 from src.model_stuff import MyResNet
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
@@ -21,11 +21,12 @@ model = MyResNet.MyResNet()
 dm = tcga_datamodules.TcgaDataModule(batch_size=128)
 class_to_idx = dm.class_to_idx
 
-trainer = Trainer(gpus=1, max_epochs=10,
+trainer = Trainer(gpus=1, max_epochs=3,
                   logger=logger,
                   callbacks=[
     LogConfusionMatrix.LogConfusionMatrix(class_to_idx),
-    PatientLevelValidation.PatientLevelValidation()])
+    PatientLevelValidation.PatientLevelValidation(),  # ])
+    DownstreamTrainer.DownstreamTrainer()])
 
 trainer.fit(model, dm)
 

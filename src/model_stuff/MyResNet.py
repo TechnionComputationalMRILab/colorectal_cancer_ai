@@ -16,18 +16,26 @@ class MyResNet(LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.model = models.resnet18(pretrained=True)
-        self.model.fc = torch.nn.Sequential(
+        torch_model = models.resnet18(pretrained=True)
+        self.feature_extractor = torch.nn.Sequential(*(list(torch_model.children())[:-1])) # just remove the fc
+        self.fc = torch.nn.Sequential(
             torch.nn.Linear(512, self.hparams.num_classes),
             torch.nn.Sigmoid(),
         )
         # self.criteria = torch.nn.BCEWithLogitsLoss()
         self.criteria = torch.nn.BCELoss()
 
+    def extract_features(self, x):
+        x = self.feature_extractor(x)
+        x = torch.flatten(x, 1) # (batch_sz, 512, 1, 1) -> (batch_sz, 512)
+        return x
+
         
     def forward(self, x):
-        return self.model(x)
-        
+        x = self.extract_features(x)
+        x = self.fc(x)
+        return x
+
     def training_step(self, batch, batch_idx):
         path, x, y = batch
         out = self(x)

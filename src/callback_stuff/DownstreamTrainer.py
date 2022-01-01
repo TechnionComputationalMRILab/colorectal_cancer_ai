@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
+from collections import defaultdict
 
-from ..data_stuff import data_tools
+from ..data_stuff.data_tools import get_patient_name_from_path
 
 class DownstreamMLP(pl.LightningModule):
     def __init__(self, num_classes=2):
@@ -58,17 +59,22 @@ class DownstreamTrainer(pl.Callback):
         Build a picture (matrix) of these embeddings and train on a patient level this way.
         """
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
-        paths, x, y = batch
-        batch_outputs = outputs["batch_outputs"]
-        # embeddings = outputs["batch_embeddings"]
-        # self.patient_eval(paths, batch_outputs, y, 'train')
+    # # Was going to use this in init but realized I dont have pl_module there... so I have to do it in on_validation_epoch_end on the fly
+    # def make_patient_label_dict(self, dl):
+    #     """ makes train and val dicts like {patient: label} """
 
-    
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
-        paths, x, y = batch
-        batch_outputs = outputs["batch_outputs"]
-        # self.patient_eval(paths, batch_outputs, y, 'val')
+    #     train_patient_label_dict = {}
+    #     val_patient_label_dict = {}
+
+    #     for paths, x, y in dl:
+    #         patient_ids = [get_patient_name_from_path(path) for path in paths]
+    #         for p, l in zip(patient_ids, y):
+    #             # if patient is already in dict, just check that the label is right
+    #             if p in patient_label_dict:
+    #                 assert (patient_label_dict[p] == l), "🛑 labels for patches not consistent"
+    #             else:
+    #                 patient_label_dict[p] = l
+
 
     def on_validation_epoch_end(self, trainer, pl_module):
         print("IN VAL EPOCH END from downstream trainer 🤫")
@@ -77,9 +83,20 @@ class DownstreamTrainer(pl.Callback):
         logger = trainer.logger
 
         # get all embeddings
+        patient_embedding_dict = defaultdict(list)
+        patient_label_dict = defaultdict(list)
         for paths, x, y in train_dl:
-            patient_ids = [data_tools.get_patient_name_from_path(path) for path in paths]
-            print('patient_ids:', patient_ids)
+            x = x.to(pl_module.device)
+            batch_embeddings = pl_module(x).cpu().detach()
+            patient_ids = [get_patient_name_from_path(path) for path in paths]
+            for p, e, l in zip(patient_ids, batch_embeddings, y):
+                patient_embedding_dict[p].extend(e)
+                if p in patient_label_dict:
+                    assert(patient_label_dict[p] == l), "🛑 labels for patches not consistent"
+                else:
+                    patient_label_dict[p] = l
+
+        # now need to make very custom dataloaders from these dicts and train on them
 
         trainer = Trainer(gpus=1, max_epochs=3,
                                   logger=logger)
