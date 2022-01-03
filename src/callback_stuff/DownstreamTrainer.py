@@ -1,5 +1,7 @@
+import torch
 import pytorch_lightning as pl
 from collections import defaultdict
+from tqdm import tqdm
 
 from ..data_stuff.data_tools import get_patient_name_from_path
 
@@ -77,7 +79,7 @@ class DownstreamTrainer(pl.Callback):
 
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        print("IN VAL EPOCH END from downstream trainer 🤫")
+        # print("IN VAL EPOCH END from downstream trainer 🤫 \n")
         train_dl = trainer.datamodule.train_dataloader()
         val_dl = trainer.datamodule.val_dataloader()
         logger = trainer.logger
@@ -85,20 +87,48 @@ class DownstreamTrainer(pl.Callback):
         # get all embeddings
         patient_embedding_dict = defaultdict(list)
         patient_label_dict = defaultdict(list)
-        for paths, x, y in train_dl:
-            x = x.to(pl_module.device)
-            batch_embeddings = pl_module(x).cpu().detach()
-            patient_ids = [get_patient_name_from_path(path) for path in paths]
-            for p, e, l in zip(patient_ids, batch_embeddings, y):
-                patient_embedding_dict[p].extend(e)
-                if p in patient_label_dict:
-                    assert(patient_label_dict[p] == l), "🛑 labels for patches not consistent"
-                else:
-                    patient_label_dict[p] = l
+        with torch.no_grad():
+            for paths, x, y in tqdm(train_dl, desc="downstream training..." , leave=True):
+                x = x.to(pl_module.device)
+                batch_embeddings = pl_module.extract_features(x).cpu().detach()
+                del x
+                patient_ids = [get_patient_name_from_path(path) for path in paths]
+                assert(len(patient_ids) == len(batch_embeddings) and len(batch_embeddings == len(y))), "🛑 lengths bad"
+                for p, e, l in zip(patient_ids, batch_embeddings, y):
+                    patient_embedding_dict[p].append(e) # e is an individual patch embedding
+                    if p in patient_label_dict:
+                        assert(patient_label_dict[p] == l), "🛑 labels for patches not consistent"
+                    else:
+                        patient_label_dict[p] = l
+
+        num_patients = len(patient_embedding_dict)
+        all_embeddings = list(patient_embedding_dict.values())
+        embedding_lens = [len(e_list) for e_list in all_embeddings]
+        min_num_embeddings = min(embedding_lens)
+        max_num_embeddings = max(embedding_lens)
+        avg_num_embeddings = sum(embedding_lens)/len(embedding_lens)
+        median_num_embeddings = embedding_lens[int(len(embedding_lens)/2)]
+
+        f_str =(f"\n---\n"
+        f"Num Patients        : {num_patients}\n"
+        f"Embedding ex shape  : {all_embeddings[0][0].shape}\n"
+        # f"embedding ex        : {all_embeddings[0]}"
+        f"First 15 emb lens   : {sorted(embedding_lens)[:20]}\n"
+        f"Min num embeddings  : {min_num_embeddings}\n"
+        f"Max num embeddings  : {max_num_embeddings}\n"
+        f"Avg num embeddings  : {avg_num_embeddings}\n"
+        f"Med num embeddings  : {median_num_embeddings}\n"
+        f"---\n")
+        print(f_str)
+
+        torch.cuda.empty_cache()
+        del patient_embedding_dict
+        del patient_label_dict
+        del train_dl
+        del val_dl
 
         # now need to make very custom dataloaders from these dicts and train on them
 
-        trainer = Trainer(gpus=1, max_epochs=3,
-                                  logger=logger)
+        # trainer = pl.Trainer(gpus=1, max_epochs=3, logger=logger)
         
         
