@@ -7,25 +7,29 @@ from pytorch_lightning import Trainer
 # MY local imports
 from src.callback_stuff import LogConfusionMatrix, PatientLevelValidation, DownstreamTrainer
 from src.data_stuff import tcga_datamodules
-from src.model_stuff import MyResNet, MySwinTransformer
+from src.model_stuff import MyResNet
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
-print("---- SWINT Exp (tcga) ----")
+
+print("---- RESNET Exp (tcga) ----")
 print('CUDA available:', torch.cuda.is_available())
 
-EXP_NAME = "tcga_SwinT"
+EXP_NAME = "tcga_Resnet_withDownstream"
 logger = TensorBoardLogger("/workspace/repos/lightning_logs", name=EXP_NAME)
 
-model = MySwinTransformer.MySwinTransformer(num_classes=2)
+model = MyResNet.MyResNet()
 dm = tcga_datamodules.TcgaDataModule(batch_size=128)
 class_to_idx = dm.get_class_to_idx_dict()
 
-trainer = Trainer(gpus=1, max_epochs=45,
-        logger=logger, 
+trainer = Trainer(gpus=1, max_epochs=8,
+        logger=logger,
+        # reload_dataloaders_every_epoch=True,
         callbacks=[
-            LogConfusionMatrix.LogConfusionMatrix(class_to_idx=class_to_idx),
-            PatientLevelValidation.PatientLevelValidation()
+            LogConfusionMatrix.LogConfusionMatrix(class_to_idx),
+            PatientLevelValidation.PatientLevelValidation(),
+            DownstreamTrainer.DownstreamTrainer()
             ],
         )
 
 trainer.fit(model, dm)
+

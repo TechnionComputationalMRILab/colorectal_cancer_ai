@@ -29,7 +29,6 @@ class MyResNet(LightningModule):
         x = self.feature_extractor(x)
         x = torch.flatten(x, 1) # (batch_sz, 512, 1, 1) -> (batch_sz, 512)
         return x
-
         
     def forward(self, x):
         x = self.extract_features(x)
@@ -43,8 +42,8 @@ class MyResNet(LightningModule):
         loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
         acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         
-        self.log('train_loss', loss)
-        self.log('train_acc', acc)
+        self.log('train_loss', loss, on_step=True, on_epoch=True)
+        self.log('train_acc', acc, on_step=True, on_epoch=True)
         loss = loss.unsqueeze(dim=-1)
         return {"loss": loss, "acc": acc, "batch_outputs": out.clone().detach()}
 
@@ -56,8 +55,8 @@ class MyResNet(LightningModule):
         val_loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
         val_acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         
-        self.log('val_loss', val_loss)
-        self.log('val_acc', val_acc)
+        self.log('val_loss', val_loss, on_step=True, on_epoch=True)
+        self.log('val_acc', val_acc, on_step=True, on_epoch=True)
         val_loss = val_loss.unsqueeze(dim=-1)
         return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out.clone().detach()}
     

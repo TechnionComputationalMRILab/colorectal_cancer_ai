@@ -1,20 +1,58 @@
 import pytorch_lightning as pl
 import torch
 import torchvision
+import os
+import tarfile
+import hashlib
+
+# https://github.com/fastai/imagenette
 
 # local imports
 from ..data_stuff import dataset_tools
 
-class TcgaDataModule(pl.LightningDataModule):
+class ImagenetteDataModule(pl.LightningDataModule):
     def __init__(self,
-            data_dir: str = "/workspace/repos/TCGA/data/",
+            data_dir: str = "/workspace/repos/imagenette_data",
             batch_size: int = 64,
             num_workers: int = 8,
             fast_subset: bool = False):
         super().__init__()
-        self.data_dir = data_dir
-        self.train_dir = self.data_dir + 'train'
-        self.val_dir = self.data_dir + 'test'
+
+        #choose image sizes:
+        datasets = {
+            'full_sz': 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette2.tgz', # 1.5GB
+            '320px': 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-320.tgz', # 326mb
+            '160px': 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-160.tgz' # 94mb
+        }
+
+        dataset_url = datasets['320px']
+        dataset_filename = dataset_url.split('/')[-1]
+        dataset_foldername = dataset_filename.split('.')[0]
+        dataset_filepath = os.path.join(data_dir,dataset_filename)
+        dataset_folderpath = os.path.join(data_dir,dataset_foldername)
+        os.makedirs(data_dir, exist_ok=True)
+        download = False
+        if not os.path.exists(dataset_filepath):
+            download = True
+        else:
+            md5_hash = hashlib.md5()
+            file = open(dataset_filepath, "rb")
+            content = file.read()
+            md5_hash.update(content)
+            digest = md5_hash.hexdigest()
+            if digest != 'fe2fc210e6bb7c5664d602c3cd71e612':
+                download = True
+        if download:
+            print(f"⬇️  downloading imagenette...")
+            torchvision.datasets.utils.download_url(dataset_url, data_dir)
+            print("... done!")
+
+        with tarfile.open(dataset_filepath, 'r:gz') as tar:
+            tar.extractall(path=data_dir)
+
+        self.data_dir = dataset_folderpath
+        self.train_dir = self.data_dir + '/train'
+        self.val_dir = self.data_dir + '/val'
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -25,11 +63,13 @@ class TcgaDataModule(pl.LightningDataModule):
         rgb_std = (0.2023, 0.1994, 0.2010)
         self.train_transforms = torchvision.transforms.Compose([
             # torchvision.transforms.RandomCrop(32, padding=4),
+            torchvision.transforms.Resize((224,224)),
             torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(rgb_mean, rgb_std),
         ])
         self.val_transforms = torchvision.transforms.Compose([
+            torchvision.transforms.Resize((224,224)),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(rgb_mean, rgb_std),
         ])
