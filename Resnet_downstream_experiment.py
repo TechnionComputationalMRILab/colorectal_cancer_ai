@@ -5,13 +5,13 @@ install(["pytorch-lightning", "seaborn", "timm"], quietly=True)
 import torch
 from pytorch_lightning import Trainer
 # MY local imports
-from src.callback_stuff import LogConfusionMatrix, PatientLevelValidation, DownstreamTrainer
+from src.callback_stuff import LogConfusionMatrix, PatientLevelValidation, DownstreamTrainer2
 from src.data_stuff import tcga_datamodules
 from src.model_stuff import MyResNet
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 
-print("---- RESNET Exp (tcga) ----")
+print("---- RESNET Exp (tcga) W/Downstream ----")
 print('CUDA available:', torch.cuda.is_available())
 
 EXP_NAME = "tcga_Resnet_withDownstream"
@@ -27,7 +27,7 @@ trainer = Trainer(gpus=1, max_epochs=8,
         callbacks=[
             LogConfusionMatrix.LogConfusionMatrix(class_to_idx),
             PatientLevelValidation.PatientLevelValidation(),
-            DownstreamTrainer.DownstreamTrainer()
+            DownstreamTrainer2.DownstreamTrainer()
             ],
         )
 

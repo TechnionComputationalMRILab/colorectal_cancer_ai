@@ -36,10 +36,10 @@ class MySwinTransformer(LightningModule):
         loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
         acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         
-        # self.log('train_loss', loss, on_step=True, on_epoch=True)
-        # self.log('train_acc', acc,  loss, on_step=True, on_epoch=True)
-        self.log('train_loss', loss)
-        self.log('train_acc', acc)
+        self.log('train_loss', loss, on_step=True, on_epoch=True)
+        self.log('train_acc', acc, on_step=True, on_epoch=True)
+        # self.log('train_loss', loss)
+        # self.log('train_acc', acc)
         loss = loss.unsqueeze(dim=-1)
         return {"loss": loss, "acc": acc, "batch_outputs": out.clone().detach()}
 
@@ -50,9 +50,11 @@ class MySwinTransformer(LightningModule):
         
         val_loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
         val_acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
-        
-        self.log('val_loss', val_loss)
-        self.log('val_acc', val_acc)
+
+        self.log('val_loss', val_loss, on_step=True, on_epoch=True)
+        self.log('val_acc', val_acc, on_step=True, on_epoch=True)
+        # self.log('val_loss', val_loss)
+        # self.log('val_acc', val_acc)
         val_loss = val_loss.unsqueeze(dim=-1)
         return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out.clone().detach()}
     
