@@ -39,4 +39,12 @@ import pdb; pdb.set_trace()
 # (Pdb) sample["data"].shape
 # torch.Size([2, 5, 224, 224, 3])
 
+"""
+Since I dont want to make a custom dataloader, do this in training loop:
+    From the dataloader, we have sample["data"].shape =>                        torch.Size([2, 5, 224, 224, 3])
+    So do: sample["data"].view(d_shape[0]*d_shape[1], *d_shape[2:]).shape =>    torch.Size([10, 224, 224, 3])
+    Also, have to do something about the labels & patients.
+    """
+
+
 print("--- done test ---")

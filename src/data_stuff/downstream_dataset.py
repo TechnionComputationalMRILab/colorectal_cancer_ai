@@ -57,7 +57,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
                 for group in grouped_list:
                     if None not in group:
                         train_index_mapping.append({
-                            "label": class_label, 
+                            "label": [class_label]*self.group_size, 
                             "patient_id": patient_id, 
                             "data_paths": group 
                             })
