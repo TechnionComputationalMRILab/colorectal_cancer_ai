@@ -74,12 +74,12 @@ class MyDownstreamModel(LightningModule):
         
         # self.log('train_loss', loss, on_step=True, on_epoch=True)
         # self.log('train_acc', acc, on_step=True, on_epoch=True)
-        if self.current_epoch == self.max_epochs:
-            print("\t✅ Logging last epoch train loss/acc")
-            self.log('downstream_train_loss', loss, on_step=False, on_epoch=True)
-            self.log('downstream_train_acc', acc, on_step=False, on_epoch=True)
+        # if self.current_epoch == self.max_epochs:
+        #     print("\t✅ Logging last epoch train loss/acc")
+        #     self.log('downstream_train_loss', loss, on_step=False, on_epoch=True)
+        #     self.log('downstream_train_acc', acc, on_step=False, on_epoch=True)
         loss = loss.unsqueeze(dim=-1)
-        return {"loss_downstream": loss, "acc_downstream": acc, "batch_outputs_downstream": out.clone().detach()}
+        return {"loss": loss, "acc_downstream": acc, "batch_outputs_downstream": out.clone().detach()}
 
     def validation_step(self, batch, batch_idx):
         y = batch["label"]
