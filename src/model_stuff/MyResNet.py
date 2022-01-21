@@ -52,6 +52,7 @@ class MyResNet(LightningModule):
         out = self(x)
 
         
+        # import pdb; pdb.set_trace()
         val_loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
         val_acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         

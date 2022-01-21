@@ -35,30 +35,34 @@ class DownstreamTrainer(pl.Callback):
             torchvision.transforms.Normalize(rgb_mean, rgb_std),
         ])
 
-        self.train_ds = DownstreamTrainingDataset(root_dir="/workspace/repos/TCGA/data/", transform=train_transforms, dataset_type="train")
-        self.val_ds = DownstreamTrainingDataset(root_dir="/workspace/repos/TCGA/data/", transform=val_transforms, dataset_type="test")
+        self.training_group_size = 5
+
+        self.train_ds = DownstreamTrainingDataset(root_dir="/workspace/repos/TCGA/data/", transform=train_transforms, dataset_type="train", group_size=self.training_group_size)
+        self.val_ds = DownstreamTrainingDataset(root_dir="/workspace/repos/TCGA/data/", transform=val_transforms, dataset_type="test", group_size=self.training_group_size)
         self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=2, shuffle=True, num_workers=4)
         self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=2, shuffle=True, num_workers=4)
 
-    def train_downstream_model(self, model, logger, train_dl, val_dl):
-        for sample in tqdm(train_dl):
-            # sample.keys() = dict_keys(['label', 'patient_id', 'data_paths', 'data'])
-            y = list(zip(*sample["label"])) # unzip the nonsense that the pytorch dataloader did
-            d_shape = sample["data"].shape
-            nwhc_data = sample["data"].view(d_shape[0]*d_shape[1], *d_shape[2:]).shape
-            import pdb; pdb.set_trace()
-            y_hat = model(nwhc_data)
+    #def train_downstream_model(self, trainer, model, logger, train_dl, val_dl):
+
+    #    for sample in tqdm(train_dl):
+    #        # sample.keys() = dict_keys(['label', 'patient_id', 'data_paths', 'data'])
+    #        y = list(zip(*sample["label"])) # unzip the nonsense that the pytorch dataloader did
+    #        d_shape = sample["data"].shape
+    #        nwhc_data = sample["data"].view(d_shape[0]*d_shape[1], d_shape[-1], *d_shape[2:4]).to(model.device)
+    #        y_hat = model(nwhc_data)
 
 
     def on_validation_epoch_end(self, trainer, pl_module):
 
         # make dataloader from original data that loads it like this:
-        print("---- IN DOWNSTREAM TRAINER callback ----")
+        print("\n---- IN DOWNSTREAM TRAINER callback ----")
         backbone = pl_module.feature_extractor
         logger = pl_module.logger
-        model = MyDownstreamModel(backbone=backbone, num_classes=2, logger=logger)
+        model = MyDownstreamModel(backbone=backbone, num_classes=2, logger=logger, dataloader_group_size=self.training_group_size).to(pl_module.device)
         
         # train model and log highest acc after 
-        self.train_downstream_model(model, logger, self.train_dl, self.val_dl)
+        # self.train_downstream_model(trainer, model, logger, self.train_dl, self.val_dl)
+        downstream_trainer = pl.Trainer(gpus=1, max_epochs=5, logger=logger)
+        downstream_trainer.fit(model, self.train_dl, self.val_dl)
 
 

@@ -23,6 +23,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         self.transform = transform
         self.group_size = group_size
         self.classes = ["MSIMUT", "MSS"] #eventually make this inferred from folders
+        self.class_to_idx = {"MSIMUT":0, "MSS":1}
         self.dataset_type = dataset_type
         self.root_dir = root_dir
         self.train_dir = root_dir + 'train'
@@ -57,8 +58,8 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
                 for group in grouped_list:
                     if None not in group:
                         train_index_mapping.append({
-                            "label": [class_label]*self.group_size, 
-                            "patient_id": patient_id, 
+                            "label": self.class_to_idx[class_label], 
+                            "patient_id": [patient_id]*self.group_size, 
                             "data_paths": group 
                             })
         return train_index_mapping
