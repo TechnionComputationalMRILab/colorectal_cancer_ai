@@ -13,13 +13,15 @@ from ..data_stuff.data_tools import get_patient_name_from_path
 from src.data_stuff.downstream_dataset import DownstreamTrainingDataset
 
 class DownstreamTrainer(pl.Callback):
-    def __init__(self) -> None:
+    def __init__(self, data_dir="/workspace/repos/TCGA/data/") -> None:
         print("Downsteam Evaluation initialized")
         """
         Need to build a dict of {patient: [p1e, p2e, ... pne]} where pne is the embedding for patch #n of the patient
         Since n changes, I will just take the first (or random) j embeddings
         Build a picture (matrix) of these embeddings and train on a patient level this way.
         """
+
+        self.data_dir = data_dir
         
         # initialize downstream dataset/dataloader
         rgb_mean = (0.4914, 0.4822, 0.4465)
@@ -35,34 +37,24 @@ class DownstreamTrainer(pl.Callback):
             torchvision.transforms.Normalize(rgb_mean, rgb_std),
         ])
 
-        self.training_group_size = 5
+        self.training_group_size = 8
 
-        self.train_ds = DownstreamTrainingDataset(root_dir="/workspace/repos/TCGA/data/", transform=train_transforms, dataset_type="train", group_size=self.training_group_size)
-        self.val_ds = DownstreamTrainingDataset(root_dir="/workspace/repos/TCGA/data/", transform=val_transforms, dataset_type="test", group_size=self.training_group_size)
-        self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=2, shuffle=True, num_workers=4)
-        self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=2, shuffle=True, num_workers=4)
-
-    #def train_downstream_model(self, trainer, model, logger, train_dl, val_dl):
-
-    #    for sample in tqdm(train_dl):
-    #        # sample.keys() = dict_keys(['label', 'patient_id', 'data_paths', 'data'])
-    #        y = list(zip(*sample["label"])) # unzip the nonsense that the pytorch dataloader did
-    #        d_shape = sample["data"].shape
-    #        nwhc_data = sample["data"].view(d_shape[0]*d_shape[1], d_shape[-1], *d_shape[2:4]).to(model.device)
-    #        y_hat = model(nwhc_data)
-
+        self.train_ds = DownstreamTrainingDataset(root_dir=data_dir, transform=train_transforms, dataset_type="train", group_size=self.training_group_size, subset_size=0.4)
+        self.val_ds = DownstreamTrainingDataset(root_dir=data_dir, transform=val_transforms, dataset_type="test", group_size=self.training_group_size, subset_size=0.4)
+        self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=8, shuffle=True, num_workers=8)
+        self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=8, shuffle=False, num_workers=8)
 
     def on_validation_epoch_end(self, trainer, pl_module):
 
         # make dataloader from original data that loads it like this:
-        print("\n---- IN DOWNSTREAM TRAINER callback ----")
+        print("\n\n---- IN DOWNSTREAM TRAINER callback ----")
         backbone = pl_module.feature_extractor
         logger = pl_module.logger
-        model = MyDownstreamModel(backbone=backbone, num_classes=2, logger=logger, dataloader_group_size=self.training_group_size).to(pl_module.device)
+        model = MyDownstreamModel(backbone=backbone, num_classes=2, logger=logger, dataloader_group_size=self.training_group_size)
         
         # train model and log highest acc after 
         # self.train_downstream_model(trainer, model, logger, self.train_dl, self.val_dl)
-        downstream_trainer = pl.Trainer(gpus=1, max_epochs=5, logger=logger)
+        downstream_trainer = pl.Trainer(gpus=1, max_epochs=5, logger=logger, move_metrics_to_cpu=True)
         downstream_trainer.fit(model, self.train_dl, self.val_dl)
 
 

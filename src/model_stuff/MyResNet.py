@@ -20,10 +20,10 @@ class MyResNet(LightningModule):
         self.feature_extractor = torch.nn.Sequential(*(list(torch_model.children())[:-1])) # just remove the fc
         self.fc = torch.nn.Sequential(
             torch.nn.Linear(512, self.hparams.num_classes),
-            torch.nn.Sigmoid(),
+            # torch.nn.Sigmoid(),
         )
-        # self.criteria = torch.nn.BCEWithLogitsLoss()
-        self.criteria = torch.nn.BCELoss()
+        self.criteria = torch.nn.BCEWithLogitsLoss()
+        # self.criteria = torch.nn.BCELoss()
 
     def extract_features(self, x):
         x = self.feature_extractor(x)

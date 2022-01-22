@@ -41,6 +41,8 @@ class TcgaDataModule(pl.LightningDataModule):
         self.train_ds = dataset_tools.ImageFolderWithPaths(self.train_dir, self.train_transforms)
         self.val_ds   = dataset_tools.ImageFolderWithPaths(self.val_dir, self.val_transforms)
 
+        # if self.fast_subset()
+
 
     def train_dataloader(self):
         train_dataloader = torch.utils.data.DataLoader(

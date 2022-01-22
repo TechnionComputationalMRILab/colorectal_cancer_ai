@@ -12,14 +12,16 @@ from PIL import Image
 
 class DownstreamTrainingDataset(torch.utils.data.Dataset):
 
-    def __init__(self, root_dir, transform=None, dataset_type="train", group_size=5):
+    def __init__(self, root_dir, transform=None, dataset_type="train", group_size=5, subset_size=None):
         """
         Args:
             root_dir (sting): Directory with all the data (eg '/tcmldrive/databases/Public/TCGA/data/')
             transform (callable, optional): Optional transform to be applied on a sample.
             dataset_type (string): "train" or "test"
+            subset_size: percentage of dataset I want to use (implemented due to memory restrictions)
         """
         print('\tInitializing Downstream Training Dataset...')
+        self.subset_size = subset_size
         self.transform = transform
         self.group_size = group_size
         self.classes = ["MSIMUT", "MSS"] #eventually make this inferred from folders
@@ -62,6 +64,13 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
                             "patient_id": [patient_id]*self.group_size, 
                             "data_paths": group 
                             })
+
+        if self.subset_size is not None:
+            og_size = len(train_index_mapping)
+            new_size = int(og_size*self.subset_size)
+            print(f"\t♻️  using {self.subset_size}% of data for downstream training... ({new_size}/{og_size} samples)")
+            train_index_mapping = random.sample(train_index_mapping, new_size)
+
         return train_index_mapping
             
 
@@ -85,6 +94,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         patches_stack = torch.stack(patches)
         patient_set["data"] = patches_stack
         return patient_set
+        # return patient_set['label'], patient_set['patient_id'], patient_set['data_paths'], patient_set['data']
 
 
     def get_train_sample_filenames(self):

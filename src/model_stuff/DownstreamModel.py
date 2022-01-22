@@ -27,13 +27,14 @@ class MyDownstreamModel(LightningModule):
             p.requires_grad = False
 
         # trainable params
+        in_dim = 512*self.dataloader_group_size
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(2560, 1024),
+            torch.nn.Linear(in_dim, 1024),
             torch.nn.Linear(1024, self.hparams.num_classes),
-            torch.nn.Sigmoid(),
+            # torch.nn.Sigmoid(),
         )
-        # self.criteria = torch.nn.BCEWithLogitsLoss()
-        self.criteria = torch.nn.BCELoss()
+        self.criteria = torch.nn.BCEWithLogitsLoss()
+        # self.criteria = torch.nn.BCELoss()
 
     # overload logging so that it logs with the logger used for the 
     # trained feature extractor
@@ -101,8 +102,13 @@ class MyDownstreamModel(LightningModule):
         #     print("\t✅ Logging last epoch val loss/acc")
         #     self.log('downstream_val_loss', val_loss, on_step=False, on_epoch=True)
         #     self.log('downstream_val_acc', val_acc, on_step=False, on_epoch=True)
+
+        self.log('downstream_val_loss', val_loss, on_step=False, on_epoch=True)
+        self.log('downstream_val_acc', val_acc, on_step=False, on_epoch=True)
+        
         val_loss = val_loss.unsqueeze(dim=-1)
-        return {"val_loss_downstream": val_loss, "val_acc_downstream": val_acc, "batch_outputs_downstream": out.clone().detach()}
+        del batch
+        return {"val_loss_downstream": val_loss.detach(), "val_acc_downstream": val_acc.detach(), "batch_outputs_downstream": out.clone().detach()}
 
     def validation_epoch_end(self, validation_step_outputs):
         # validation_step_outputs looks like a list with length=num_steps. Each index is a dict containing outputs for each step.
@@ -115,6 +121,7 @@ class MyDownstreamModel(LightningModule):
             val_acc_downstream.append(dict_item["val_acc_downstream"].cpu().detach())
         mean_loss = torch.mean(torch.Tensor(val_loss_downstream))
         mean_acc = torch.mean(torch.Tensor(val_acc_downstream))
+        del validation_step_outputs
 
         print(f"\t --- Downstream mean loss: {mean_loss} ---")
         print(f"\t --- Downstream mean acc:  {mean_acc} ---")
