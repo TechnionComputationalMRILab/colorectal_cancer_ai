@@ -10,13 +10,14 @@ class TcgaDataModule(pl.LightningDataModule):
             data_dir: str = "/workspace/repos/TCGA/data/",
             batch_size: int = 64,
             num_workers: int = 8,
-            fast_subset: bool = False):
+            fast_subset: bool = True):
         super().__init__()
         self.data_dir = data_dir
         self.train_dir = self.data_dir + 'train'
         self.val_dir = self.data_dir + 'test'
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.fast_subset = fast_subset
 
     def prepare_data(self):
         # things to do on 1 gpu
@@ -40,9 +41,11 @@ class TcgaDataModule(pl.LightningDataModule):
         # splits, etc
         self.train_ds = dataset_tools.ImageFolderWithPaths(self.train_dir, self.train_transforms)
         self.val_ds   = dataset_tools.ImageFolderWithPaths(self.val_dir, self.val_transforms)
-
-        # if self.fast_subset()
-
+        if self.fast_subset:
+            train_idxs = list(range(int(len(self.train_ds)/2)))
+            val_idxs = list(range(int(len(self.val_ds)/2)))
+            self.train_ds = torch.utils.data.Subset(self.train_ds, train_idxs)
+            self.val_ds = torch.utils.data.Subset(self.val_ds, val_idxs)
 
     def train_dataloader(self):
         train_dataloader = torch.utils.data.DataLoader(

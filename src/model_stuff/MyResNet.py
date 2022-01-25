@@ -60,7 +60,10 @@ class MyResNet(LightningModule):
         self.log('val_acc', val_acc, on_step=True, on_epoch=True)
         val_loss = val_loss.unsqueeze(dim=-1)
         return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out.clone().detach()}
-    
+
+    # on end of train/validation, I can print stuff like this:
+    # print(f"REGULAR train loss: {train_loss} | train acc: {train_acc}")
+    # print(f"REGULAR val loss: {val_loss} | val acc: {val_acc}")
                 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)

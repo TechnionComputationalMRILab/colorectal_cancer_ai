@@ -16,13 +16,14 @@ print('CUDA available:', torch.cuda.is_available())
 
 data_dir = "/home/shats/data/data/"
 EXP_NAME = "tcga_Resnet_withDownstream"
-logger = TensorBoardLogger("./lightning_logs", name=EXP_NAME)
+logger = WandbLogger(project="moti", name=EXP_NAME)
+# logger = TensorBoardLogger("./lightning_logs", name=EXP_NAME)
 
 model = MyResNet.MyResNet()
-dm = tcga_datamodules.TcgaDataModule(data_dir=data_dir, batch_size=32)
+dm = tcga_datamodules.TcgaDataModule(data_dir=data_dir, batch_size=64)
 class_to_idx = dm.get_class_to_idx_dict()
 
-trainer = Trainer(gpus=1, max_epochs=3,
+trainer = Trainer(gpus=1, max_epochs=8,
         logger=logger,
         move_metrics_to_cpu=True,
         # reload_dataloaders_every_epoch=True,
@@ -30,7 +31,8 @@ trainer = Trainer(gpus=1, max_epochs=3,
         callbacks=[
             # LogConfusionMatrix.LogConfusionMatrix(class_to_idx),
             # PatientLevelValidation.PatientLevelValidation(),
-            DownstreamTrainer2.DownstreamTrainer(data_dir=data_dir)
+            DownstreamTrainer2.DownstreamTrainer(data_dir=data_dir,
+                downstream_max_epochs=8)
             ],
         # precision=16
         )
