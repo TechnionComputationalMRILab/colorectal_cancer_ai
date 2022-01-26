@@ -86,7 +86,9 @@ class MyDownstreamModel(LightningModule):
         acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
         
         loss = loss.unsqueeze(dim=-1)
-        return {"loss": loss, "acc_downstream": acc, "batch_outputs_downstream": out.clone().detach()}
+
+        # , "batch_outputs_downstream": out.clone().detach()}
+        return {"loss": loss, "acc_downstream": acc}
 
     def validation_step(self, batch, batch_idx):
         y = batch["label"]
@@ -104,7 +106,9 @@ class MyDownstreamModel(LightningModule):
         
         val_loss = val_loss.unsqueeze(dim=-1)
         del batch
-        return {"val_loss_downstream": val_loss.detach(), "val_acc_downstream": val_acc.detach(), "batch_outputs_downstream": out.clone().detach()}
+
+        #, "batch_outputs_downstream": out.clone().detach()}
+        return {"val_loss_downstream": val_loss.detach(), "val_acc_downstream": val_acc.detach()}
 
     def training_epoch_end(self, training_step_outputs):
         train_loss_downstream = []

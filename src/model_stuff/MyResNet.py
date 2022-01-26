@@ -45,7 +45,7 @@ class MyResNet(LightningModule):
         self.log('train_loss', loss, on_step=True, on_epoch=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True)
         loss = loss.unsqueeze(dim=-1)
-        return {"loss": loss, "acc": acc, "batch_outputs": out.clone().detach()}
+        return {"loss": loss, "acc": acc}#, "batch_outputs": out.clone().detach()}
 
     def validation_step(self, batch, batch_idx):
         path, x, y = batch
@@ -59,7 +59,7 @@ class MyResNet(LightningModule):
         self.log('val_loss', val_loss, on_step=True, on_epoch=True)
         self.log('val_acc', val_acc, on_step=True, on_epoch=True)
         val_loss = val_loss.unsqueeze(dim=-1)
-        return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out.clone().detach()}
+        return {"val_loss": val_loss, "val_acc": val_acc}#, "batch_outputs": out.clone().detach()}
 
     # on end of train/validation, I can print stuff like this:
     # print(f"REGULAR train loss: {train_loss} | train acc: {train_acc}")
