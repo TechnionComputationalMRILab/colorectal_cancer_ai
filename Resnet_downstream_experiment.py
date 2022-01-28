@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
-from src.data_stuff.pip_tools import install
-install(["pytorch-lightning", "seaborn", "timm", "wandb", "plotly"], quietly=True)
+# from src.data_stuff.pip_tools import install
+# install(["pytorch-lightning", "seaborn", "timm", "wandb", "plotly"], quietly=True)
 import torch
 from pytorch_lightning import Trainer
 # MY local imports
@@ -10,8 +10,8 @@ from src.data_stuff import tcga_datamodules
 from src.model_stuff import MyResNet
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
-ON_SERVER = "DGX"
-# ON_SERVER = "moti"
+# ON_SERVER = "DGX"
+ON_SERVER = "moti"
 
 print("---- RESNET Exp (tcga) W/Downstream ----")
 print('CUDA available:', torch.cuda.is_available())
@@ -22,7 +22,7 @@ if ON_SERVER == "DGX":
 elif ON_SERVER == "moti":
     data_dir="/home/shats/data/data/"
 
-EXP_NAME = f"tcga_Resnet_withDownstream_{ON_SERVER}_downstreamFULL"
+EXP_NAME = f"tcga_Resnet_withDownstream_{ON_SERVER}_downstream0.7"
 logger = WandbLogger(project="moti", name=EXP_NAME)
 # logger = TensorBoardLogger("./lightning_logs", name=EXP_NAME)
 
@@ -40,8 +40,9 @@ trainer = Trainer(gpus=1, max_epochs=40,
             # PatientLevelValidation.PatientLevelValidation(),
             DownstreamTrainer2.DownstreamTrainer(data_dir=data_dir,
                 downstream_max_epochs=15,
-                downstream_subset_size=0.7,
-                do_every_n_epochs=3)
+                downstream_subset_size=0.62,
+                do_every_n_epochs=3,
+                downstream_batch_size=64)
             ],
         # precision=16
         )

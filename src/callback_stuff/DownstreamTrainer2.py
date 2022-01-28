@@ -16,7 +16,13 @@ from ..data_stuff.data_tools import get_patient_name_from_path
 from src.data_stuff.downstream_dataset import DownstreamTrainingDataset
 
 class DownstreamTrainer(pl.Callback):
-    def __init__(self, data_dir="/workspace/repos/TCGA/data/", downstream_max_epochs=5, downstream_lr=1e-5, downstream_group_sz=4, downstream_subset_size=None, do_every_n_epochs=2) -> None:
+    def __init__(self, data_dir="/workspace/repos/TCGA/data/",
+            downstream_max_epochs=5,
+            downstream_lr=1e-5,
+            downstream_group_sz=4,
+            downstream_subset_size=None,
+            do_every_n_epochs=2,
+            downstream_batch_size=32) -> None:
         print("Downsteam Evaluation initialized")
         """
         Need to build a dict of {patient: [p1e, p2e, ... pne]} where pne is the embedding for patch #n of the patient
@@ -29,6 +35,7 @@ class DownstreamTrainer(pl.Callback):
         self.downstream_lr = downstream_lr
         self.downstream_subset_size = downstream_subset_size
         self.do_every_n_epochs = do_every_n_epochs
+        self.downstream_batch_size = downstream_batch_size
 
         # full_run_train/val_acc/loss_record is a list of lists.
         # each list contains the training losses/accs for that run
@@ -60,8 +67,8 @@ class DownstreamTrainer(pl.Callback):
 
         self.train_ds = DownstreamTrainingDataset(root_dir=data_dir, transform=train_transforms, dataset_type="train", group_size=self.training_group_size, subset_size=self.downstream_subset_size)
         self.val_ds = DownstreamTrainingDataset(root_dir=data_dir, transform=val_transforms, dataset_type="test", group_size=self.training_group_size, subset_size=self.downstream_subset_size)
-        self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=8, shuffle=True, num_workers=8)
-        self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=8, shuffle=False, num_workers=8)
+        self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=self.downstream_batch_size, shuffle=True, num_workers=8)
+        self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=self.downstream_batch_size, shuffle=False, num_workers=8)
 
     def on_validation_epoch_end(self, trainer, pl_module):
         
