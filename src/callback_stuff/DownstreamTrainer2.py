@@ -21,8 +21,10 @@ class DownstreamTrainer(pl.Callback):
             downstream_lr=1e-5,
             downstream_group_sz=4,
             downstream_subset_size=None,
+            start_downstream_epoch=0,
             do_every_n_epochs=2,
-            downstream_batch_size=32) -> None:
+            downstream_batch_size=32,
+            do_on_train_epoch_end=False) -> None:
         print("Downsteam Evaluation initialized")
         """
         Need to build a dict of {patient: [p1e, p2e, ... pne]} where pne is the embedding for patch #n of the patient
@@ -34,8 +36,10 @@ class DownstreamTrainer(pl.Callback):
         self.downstream_max_epochs = downstream_max_epochs
         self.downstream_lr = downstream_lr
         self.downstream_subset_size = downstream_subset_size
+        self.start_downstream_epoch = start_downstream_epoch
         self.do_every_n_epochs = do_every_n_epochs
         self.downstream_batch_size = downstream_batch_size
+        self.do_on_train_epoch_end=do_on_train_epoch_end
 
         # full_run_train/val_acc/loss_record is a list of lists.
         # each list contains the training losses/accs for that run
@@ -70,10 +74,16 @@ class DownstreamTrainer(pl.Callback):
         self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=self.downstream_batch_size, shuffle=True, num_workers=8)
         self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=self.downstream_batch_size, shuffle=False, num_workers=8)
 
+    def on_train_epoch_end(self, trainer, pl_module):
+        if self.do_on_train_epoch_end:
+            print("doing epoch end...")
+            self.on_validation_epoch_end(trainer, pl_module)
+
+
     def on_validation_epoch_end(self, trainer, pl_module):
         
         # log for the first 3 epochs and then after that only log when required:
-        if trainer.current_epoch < 3 or trainer.current_epoch%self.do_every_n_epochs==0:
+        if trainer.current_epoch < self.start_downstream_epoch or trainer.current_epoch%self.do_every_n_epochs==0:
 
             # make dataloader from original data that loads it like this:
             print("\n\n---- IN DOWNSTREAM TRAINER callback ----")
