@@ -87,7 +87,7 @@ class DownstreamTrainer(pl.Callback):
 
             # make dataloader from original data that loads it like this:
             print("\n\n---- IN DOWNSTREAM TRAINER callback ----")
-            backbone = pl_module.feature_extractor
+            backbone = pl_module.feature_extractor.backbone
             logger = pl_module.logger
             model = MyDownstreamModel(backbone=backbone, num_classes=2, logger=logger, dataloader_group_size=self.training_group_size,
                     full_run_val_acc_record=self.full_run_val_acc_record,

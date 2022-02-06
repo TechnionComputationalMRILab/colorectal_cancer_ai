@@ -48,7 +48,7 @@ class MocoDataModule(pl.LightningDataModule):
         # self.val_ds   = dataset_tools.ImageFolderWithPaths(self.val_dir, self.val_transforms)
         self.train_ds = lightly.data.LightlyDataset(input_dir=self.train_dir) # transform=self.train_transforms)
         if self.fast_subset:
-            train_idxs = list(range(int(len(self.train_ds)/60)))
+            train_idxs = list(range(int(len(self.train_ds)/100)))
             self.train_ds = torch.utils.data.Subset(self.train_ds, train_idxs)
         # self.val_ds = lightly.data.LightlyDataset(input_dir=self.val_dir, transform=self.val_transforms)
         # if self.fast_subset:

@@ -34,7 +34,12 @@ trainer = Trainer(gpus=1, max_epochs=35,
         logger=logger,
         callbacks=[
             # LogConfusionMatrix.LogConfusionMatrix(class_to_idx),
-            PatientLevelValidation.PatientLevelValidation(),  # ])
+            DownstreamTrainer2.DownstreamTrainer(data_dir=data_dir,
+                downstream_max_epochs=18,
+                downstream_subset_size=None,
+                start_downstream_epoch=3,
+                do_every_n_epochs=5,
+                downstream_batch_size=64)
             ],
         )
 

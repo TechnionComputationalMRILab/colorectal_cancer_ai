@@ -20,8 +20,9 @@ class MocoModel(pl.LightningModule):
         )
 
         # create a moco based on ResNet
+        self.num_ftrs = 512
         self.feature_extractor =\
-            lightly.models.MoCo(backbone, num_ftrs=512, m=0.99, batch_shuffle=True)
+            lightly.models.MoCo(backbone, num_ftrs=self.num_ftrs, m=0.99, batch_shuffle=True)
 
         # create our loss with the optional memory bank
         self.criterion = lightly.loss.NTXentLoss(

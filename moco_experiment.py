@@ -25,26 +25,26 @@ elif ON_SERVER == "moti":
 elif ON_SERVER == "Alsx2":
     data_dir="/home/shats/data/data/"
 
-EXP_NAME = f"tcga_MOCO_{ON_SERVER}_"
+EXP_NAME = f"tcga_MOCO_{ON_SERVER}_FULLDATASET"
 logger = WandbLogger(project="moti", name=EXP_NAME)
 
 memory_bank_size = 4096
-moco_max_epochs = 900
+moco_max_epochs = 100
 # downstream_max_epochs = 60
 # downstream_test_every = 50
 model = moco_model.MocoModel(memory_bank_size, moco_max_epochs)
-dm = tcga_moco_dm.MocoDataModule(data_dir=data_dir, fast_subset=True)
+dm = tcga_moco_dm.MocoDataModule(data_dir=data_dir,batch_size=32, fast_subset=False)
 
 trainer = Trainer(gpus=1, max_epochs=moco_max_epochs,
         logger=logger,
         callbacks=[
             # LogConfusionMatrix.LogConfusionMatrix(class_to_idx),
             DownstreamTrainer2.DownstreamTrainer(data_dir=data_dir,
-                downstream_max_epochs=18,
+                downstream_max_epochs=13,
                 downstream_subset_size=None,
                 start_downstream_epoch=3,
                 do_every_n_epochs=5,
-                downstream_batch_size=64,
+                downstream_batch_size=32,
                 do_on_train_epoch_end=True)
             ],
         )
