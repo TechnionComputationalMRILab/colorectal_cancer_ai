@@ -11,14 +11,16 @@ class MocoDataModule(pl.LightningDataModule):
             data_dir: str = "/workspace/repos/TCGA/data/",
             batch_size: int = 64,
             num_workers: int = 8,
-            fast_subset: bool = False):
+            subset_size: float = None
+            ):
+            # fast_subset: bool = False):
         super().__init__()
         self.data_dir = data_dir
         self.train_dir = self.data_dir + 'train'
         # self.val_dir = self.data_dir + 'test'
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.fast_subset = fast_subset
+        self.subset_size = subset_size
         self.collate_fn = collate_fn = lightly.data.SimCLRCollateFunction(
             input_size=224,
             gaussian_blur=0.,
@@ -44,18 +46,15 @@ class MocoDataModule(pl.LightningDataModule):
     def setup(self, stage):
         # things to do on every accelerator (distibuted mode)
         # splits, etc
-        # self.train_ds = dataset_tools.ImageFolderWithPaths(self.train_dir, self.train_transforms)
-        # self.val_ds   = dataset_tools.ImageFolderWithPaths(self.val_dir, self.val_transforms)
         self.train_ds = lightly.data.LightlyDataset(input_dir=self.train_dir) # transform=self.train_transforms)
-        if self.fast_subset:
-            train_idxs = list(range(int(len(self.train_ds)/100)))
+
+        # subset data if needed
+        if self.subset_size is not None:
+            print(f"Training MocoDataModule with subset size {self.subset_size}")
+            train_idxs = list(range(int(len(self.train_ds)*self.subset_size)))
             self.train_ds = torch.utils.data.Subset(self.train_ds, train_idxs)
-        # self.val_ds = lightly.data.LightlyDataset(input_dir=self.val_dir, transform=self.val_transforms)
-        # if self.fast_subset:
-        #     train_idxs = list(range(int(len(self.train_ds)/2)))
-        #     val_idxs = list(range(int(len(self.val_ds)/2)))
-        #     self.train_ds = torch.utils.data.Subset(self.train_ds, train_idxs)
-        #     self.val_ds = torch.utils.data.Subset(self.val_ds, val_idxs)
+        else:
+            print(f"Training MocoDataModule with FULL dataset")
 
     def train_dataloader(self):
         train_dataloader = torch.utils.data.DataLoader(

@@ -14,7 +14,7 @@ from ..data_stuff import dataset_tools
 import re
 
 class MyDownstreamModel(LightningModule):
-    def __init__(self, backbone, num_classes=2, logger=None, dataloader_group_size=6, full_run_val_acc_record=None, full_run_train_acc_record=None):
+    def __init__(self, backbone, num_classes=2, logger=None, dataloader_group_size=6):
         super().__init__()
         self.num_classes=num_classes
         # self.save_hyperparameters()
@@ -42,11 +42,12 @@ class MyDownstreamModel(LightningModule):
 
         # for logging
         # self.downstream_val_accs_table = downstream_val_accs_table
-        self.full_run_val_acc_record = full_run_val_acc_record
-        self.full_run_train_acc_record = full_run_train_acc_record
-        self.downstream_val_losses = []
-        self.downstream_val_accs = []
-        self.downstream_train_accs = []
+        # self.full_run_train_acc_record = full_run_train_acc_record
+        self.downstream_val_losses = [] # avg per epoch
+        self.downstream_val_accs = [] # avg per epoch
+        self.downstream_train_losses = []
+        self.downstream_train_accs = [] # avg per epoch
+
 
     # overload logging so that it logs with the logger used for the 
     # trained feature extractor
@@ -118,13 +119,9 @@ class MyDownstreamModel(LightningModule):
             train_acc_downstream.append(dict_item["acc_downstream"].cpu().detach())
         mean_train_loss = torch.mean(torch.Tensor(train_loss_downstream))
         mean_train_acc = torch.mean(torch.Tensor(train_acc_downstream))
+        self.downstream_train_losses.append(float(mean_train_loss))
         self.downstream_train_accs.append(float(mean_train_acc))
 
-        ### keep track of accuracy level plots with matplotlib
-        if self.current_epoch == self.trainer.max_epochs-1:
-            if self.full_run_train_acc_record is not None:
-                print("Appending to train accs table")
-                self.full_run_train_acc_record.append(self.downstream_train_accs) # add row of val_accs
 
     def validation_epoch_end(self, validation_step_outputs):
         # validation_step_outputs looks like a list with length=num_steps. Each index is a dict containing outputs for each step.
@@ -139,14 +136,7 @@ class MyDownstreamModel(LightningModule):
         mean_val_acc = torch.mean(torch.Tensor(val_acc_downstream))
         self.downstream_val_losses.append(float(mean_val_loss))
         self.downstream_val_accs.append(float(mean_val_acc))
-        del validation_step_outputs
         
-        ### keep track of accuracy level plots with matplotlib
-        if self.current_epoch == self.trainer.max_epochs-1:
-            if self.full_run_val_acc_record is not None:
-                print("Appending to val accs table")
-                self.full_run_val_acc_record.append(self.downstream_val_accs) # add row of val_accs
-
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-4)
     
