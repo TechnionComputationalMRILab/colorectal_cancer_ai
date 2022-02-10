@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-ON_SERVER = "DGX"
+# pip install pytorch-lightning seaborn timm wandb plotly lightly opencv-python
+
+# ON_SERVER = "DGX"
 # ON_SERVER = "moti"
 # ON_SERVER = "Alsx2"
+ON_SERVER = "argus"
 
 data_dir=None
 checkpoint_dir = "./saved_models/"
@@ -12,6 +15,8 @@ if ON_SERVER == "DGX":
     checkpoint_dir = "/workspace/repos/colorectal_cancer_ai/saved_models/"
     from src.data_stuff.pip_tools import install
     install(["pytorch-lightning", "seaborn", "timm", "wandb", "plotly", "lightly"], quietly=True)
+elif ON_SERVER == "argus":
+    data_dir="/tcmldrive/databases/Public/TCGA/data/"
 elif ON_SERVER == "moti":
     data_dir="/home/shats/data/data/"
 elif ON_SERVER == "Alsx2":
@@ -28,12 +33,12 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 
 # --- hypers --- #
-data_subset=0.5
-batch_size=1024
+data_subset=None
+batch_size=64
 num_nodes=1
 gpus=2
-num_workers=16
-strat="ddp_cpu"
+num_workers=64
+strat="ddp"
 # ------------- #
 
 EXP_NAME = f"tcga_MOCO_{ON_SERVER}_datasz{data_subset}_bs{batch_size}_gpus{gpus}_nodes{num_nodes}"
@@ -57,7 +62,7 @@ dm = tcga_moco_dm.MocoDataModule(data_dir=data_dir,
 # monitors
 checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir+"moco",
-    filename='{epoch}-{train_loss_ssl:.2f}',
+    filename='{epoch}-{MOCO_train_loss_ssl:.2f}',
     save_top_k=3,
     verbose=True,
     monitor='MOCO_train_loss_ssl',
