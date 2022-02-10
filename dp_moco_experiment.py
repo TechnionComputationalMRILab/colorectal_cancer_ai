@@ -37,7 +37,7 @@ data_subset=None
 batch_size=64
 num_nodes=1
 gpus=2
-num_workers=64
+num_workers=16
 strat="ddp"
 # ------------- #
 
@@ -56,7 +56,7 @@ model = moco_model.MocoModel(memory_bank_size, moco_max_epochs)
 dm = tcga_moco_dm.MocoDataModule(data_dir=data_dir,
         batch_size=batch_size, 
         subset_size=data_subset,
-        num_workers=16)
+        num_workers=num_workers)
 
 
 # monitors
