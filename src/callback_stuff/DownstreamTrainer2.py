@@ -78,8 +78,18 @@ class DownstreamTrainer(pl.Callback):
 
         self.training_group_size = 8
 
-        self.train_ds = DownstreamTrainingDataset(root_dir=data_dir, transform=train_transforms, dataset_type="train", group_size=self.training_group_size, subset_size=self.downstream_subset_size)
-        self.val_ds = DownstreamTrainingDataset(root_dir=data_dir, transform=val_transforms, dataset_type="test", group_size=self.training_group_size, subset_size=self.downstream_subset_size)
+        self.train_ds = DownstreamTrainingDataset(
+                root_dir=data_dir, 
+                transform=train_transforms, 
+                dataset_type="train", 
+                group_size=self.training_group_size, 
+                subset_size=self.downstream_subset_size)
+        self.val_ds = DownstreamTrainingDataset(
+                root_dir=data_dir, 
+                transform=val_transforms, 
+                dataset_type="test", 
+                group_size=self.training_group_size, 
+                subset_size=self.downstream_subset_size)
         self.train_dl = torch.utils.data.DataLoader(self.train_ds, batch_size=self.downstream_batch_size, shuffle=True, num_workers=8)
         self.val_dl = torch.utils.data.DataLoader(self.val_ds, batch_size=self.downstream_batch_size, shuffle=False, num_workers=8)
 
@@ -95,7 +105,8 @@ class DownstreamTrainer(pl.Callback):
         if trainer.current_epoch < self.do_first_n_epochs or trainer.current_epoch%self.do_every_n_epochs==0:
 
             # make dataloader from original data that loads it like this:
-            print("\n\n---- IN DOWNSTREAM TRAINER callback ----")
+            print("\n\n---------------------------------------------")
+            print("---- 💁 IN DOWNSTREAM TRAINER callback 🕵️ ----")
             backbone = pl_module.feature_extractor.backbone
             logger = pl_module.logger
             model = MyDownstreamModel(backbone=backbone,
@@ -118,9 +129,9 @@ class DownstreamTrainer(pl.Callback):
             # append these metrics to what we already have in the df based on moco epoch num
             moco_epoch = trainer.current_epoch
             self.val_acc_record_df[f"ep_{moco_epoch}"] = epoch_val_accs
-            self.val_loss_record_df[f"ep_{moco_epoch}"] = epoch_val_accs
-            self.train_acc_record_df[f"ep_{moco_epoch}"] = epoch_val_accs
-            self.train_loss_record_df[f"ep_{moco_epoch}"] = epoch_val_accs
+            self.val_loss_record_df[f"ep_{moco_epoch}"] = epoch_val_losses
+            self.train_acc_record_df[f"ep_{moco_epoch}"] = epoch_train_accs
+            self.train_loss_record_df[f"ep_{moco_epoch}"] = epoch_train_losses
 
             # plot
             self.wandb_log_metric_df(self.val_acc_record_df, name="Downstream Val Accuracy")
@@ -128,6 +139,8 @@ class DownstreamTrainer(pl.Callback):
             self.wandb_log_metric_df(self.train_acc_record_df, name="Downstream Train Accuracy")
             self.wandb_log_metric_df(self.train_loss_record_df, name="Downstream Train Loss")
 
+            print("---- 🚣 LEAVING DOWNSTREAM TRAINER callback 🏊 ----")
+            print("---------------------------------------------------\n\n")
 
 
     def wandb_log_metric_df(self, df, name="Downstream Val Accuracy"):
