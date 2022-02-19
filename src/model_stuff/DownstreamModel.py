@@ -14,9 +14,10 @@ from ..data_stuff import dataset_tools
 import re
 
 class MyDownstreamModel(LightningModule):
-    def __init__(self, backbone, num_classes=2, logger=None, dataloader_group_size=6):
+    def __init__(self, backbone, num_classes=2, logger=None, dataloader_group_size=6, log_everything=False):
         super().__init__()
         self.num_classes=num_classes
+        self.log_everything = log_everything
         # self.save_hyperparameters()
 
         # just pass the feature extractor
@@ -51,8 +52,8 @@ class MyDownstreamModel(LightningModule):
 
     # overload logging so that it logs with the logger used for the 
     # trained feature extractor
-    def log(name, value, on_step, on_epoch):
-        return self.parent_logger(name, value, on_step, on_epoch)
+    # def log(name, value, on_step, on_epoch):
+    #    return self.parent_logger.log(name, value, on_step=on_step, on_epoch=on_epoch)
 
     def extract_features(self, x):
         x = self.feature_extractor(x)
@@ -85,10 +86,12 @@ class MyDownstreamModel(LightningModule):
 
         loss = self.criteria(out, torch.nn.functional.one_hot(y, self.num_classes).float())
         acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
-        
         loss = loss.unsqueeze(dim=-1)
 
         # , "batch_outputs_downstream": out.clone().detach()}
+        if self.log_everything:
+            self.log("train_loss", loss, on_step=True, on_epoch=True)
+            self.log('train_acc', acc, on_step=True, on_epoch=True)
         return {"loss": loss, "acc_downstream": acc}
 
     def validation_step(self, batch, batch_idx):
@@ -104,7 +107,9 @@ class MyDownstreamModel(LightningModule):
 
         val_loss = self.criteria(out, torch.nn.functional.one_hot(y.long(), self.num_classes).float())
         val_acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
-        
+        if self.log_everything:
+            self.log('val_loss', val_loss, on_step=True, on_epoch=True)
+            self.log('val_acc', val_acc, on_step=True, on_epoch=True)
         val_loss = val_loss.unsqueeze(dim=-1)
         del batch
 

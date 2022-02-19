@@ -3,10 +3,10 @@
 
 # pip install pytorch-lightning seaborn timm wandb plotly lightly opencv-python
 
-# ON_SERVER = "DGX"
+ON_SERVER = "DGX"
 # ON_SERVER = "moti"
 # ON_SERVER = "Alsx2"
-ON_SERVER = "argus"
+# ON_SERVER = "argus"
 
 data_dir=None
 checkpoint_dir = "./saved_models/"
@@ -14,7 +14,7 @@ if ON_SERVER == "DGX":
     data_dir="/workspace/repos/TCGA/data/"
     checkpoint_dir = "/workspace/repos/colorectal_cancer_ai/saved_models/"
     from src.data_stuff.pip_tools import install
-    install(["pytorch-lightning", "seaborn", "timm", "wandb", "plotly", "lightly"], quietly=True)
+    install(["torch", "torchtext", "pytorch-lightning", "seaborn", "timm", "wandb", "plotly", "lightly"], quietly=True)
 elif ON_SERVER == "argus":
     data_dir="/tcmldrive/databases/Public/TCGA/data/"
 elif ON_SERVER == "moti":
@@ -34,9 +34,9 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 # --- hypers --- #
 data_subset=None
-batch_size=64
-num_nodes=1
-gpus=2
+batch_size=128
+num_nodes=2
+gpus=1
 num_workers=16
 strat="ddp"
 # ------------- #

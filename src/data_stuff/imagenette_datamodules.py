@@ -63,13 +63,15 @@ class ImagenetteDataModule(pl.LightningDataModule):
         rgb_std = (0.2023, 0.1994, 0.2010)
         self.train_transforms = torchvision.transforms.Compose([
             # torchvision.transforms.RandomCrop(32, padding=4),
-            torchvision.transforms.Resize((224,224)),
+            # torchvision.transforms.Resize((224,224)),
+            torchvision.transforms.Resize((5000, 5000)),
             torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(rgb_mean, rgb_std),
         ])
         self.val_transforms = torchvision.transforms.Compose([
-            torchvision.transforms.Resize((224,224)),
+            # torchvision.transforms.Resize((224,224)),
+            torchvision.transforms.Resize((5000, 5000)),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(rgb_mean, rgb_std),
         ])
