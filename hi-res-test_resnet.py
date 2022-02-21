@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 from src.data_stuff.pip_tools import install
-install(["pytorch-lightning", "seaborn", "timm"], quietly=True)
+install(["pytorch-lightning", "seaborn", "timm", "wandb"], quietly=True)
 import torch
 from pytorch_lightning import Trainer
 # MY local imports
@@ -15,10 +15,11 @@ print("---- RESNET Exp (imagenette) ----")
 print('CUDA available:', torch.cuda.is_available())
 
 EXP_NAME = "imagenette_Resnet_HIRES"
-logger = TensorBoardLogger("/workspace/repos/lightning_logs", name=EXP_NAME)
+# logger = TensorBoardLogger("/workspace/repos/lightning_logs", name=EXP_NAME)
+logger=WandbLogger(project="moti", name=EXP_NAME)
 
 # dm = tcga_datamodules.TcgaDataModule(batch_size=128)
-dm = imagenette_datamodules.ImagenetteDataModule(batch_size=4)
+dm = imagenette_datamodules.ImagenetteDataModule(batch_size=2)
 model = MyResNet.MyResNet(num_classes=len(dm.get_class_to_idx_dict()))
 class_to_idx = dm.get_class_to_idx_dict()
 
