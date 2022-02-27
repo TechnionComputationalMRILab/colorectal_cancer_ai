@@ -3,9 +3,9 @@
 
 # pip install pytorch-lightning seaborn timm wandb plotly lightly opencv-python
 
-ON_SERVER = "DGX"
+# ON_SERVER = "DGX"
 # ON_SERVER = "moti"
-# ON_SERVER = "Alsx2"
+ON_SERVER = "Alsx2"
 # ON_SERVER = "argus"
 
 data_dir=None
@@ -39,12 +39,13 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 # --- hypers --- #
 data_subset=None
-batch_size=64
+batch_size=32
 # num_nodes=1
 gpus=1
-num_workers=16
+num_workers=32
 # strat="ddp"
-training_group_size = 12
+training_group_size = 8
+min_patches_per_patient=8
 # ------------- #
 
 EXP_NAME = f"tcga_mocoDOWNSTREAM_{ON_SERVER}_datasz{data_subset}_bs{batch_size}_gpus{gpus}_tgs{training_group_size}"
@@ -75,13 +76,17 @@ train_ds = DownstreamTrainingDataset(
         transform=train_transforms, 
         dataset_type="train", 
         group_size=training_group_size, 
-        subset_size=data_subset)
+        subset_size=data_subset,
+        min_patches_per_patient=min_patches_per_patient
+        )
 val_ds = DownstreamTrainingDataset(
         root_dir=data_dir, 
         transform=val_transforms, 
         dataset_type="test", 
         group_size=training_group_size, 
-        subset_size=data_subset)
+        subset_size=data_subset,
+        min_patches_per_patient=min_patches_per_patient
+        )
 train_dl = torch.utils.data.DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=8)
 val_dl = torch.utils.data.DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8)
 
@@ -90,7 +95,8 @@ memory_bank_size = 4096
 moco_max_epochs = 900
 # read model
 # model_loc = "/workspace/repos/colorectal_cancer_ai/saved_models_from_elsewhere/epoch=183-MOCO_train_loss_ssl=1.65.ckpt"
-model_loc = "/workspace/repos/colorectal_cancer_ai/saved_models/moco/epoch=500-MOCO_train_loss_ssl=0.89.ckpt"
+# model_loc = "/workspace/repos/colorectal_cancer_ai/saved_models/moco/epoch=500-MOCO_train_loss_ssl=0.89.ckpt"
+model_loc = "/home/shats/repos/colorectal_cancer_ai/saved_models_from_elsewhere/epoch=510-MOCO_train_loss_ssl=0.88.ckpt"
 model = moco_model.MocoModel(memory_bank_size, moco_max_epochs).load_from_checkpoint(model_loc, memory_bank_size=memory_bank_size)
 
 backbone = model.feature_extractor.backbone
@@ -100,5 +106,8 @@ model = MyDownstreamModel(backbone=backbone, num_classes=2, logger=logger, datal
 trainer = Trainer(gpus=gpus,
         max_epochs=80,
         logger=logger,
+        callbacks=[
+            PatientLevelValidation.PatientLevelValidation(multi_patch=True),
+            ]
         )
 trainer.fit(model, train_dl, val_dl)

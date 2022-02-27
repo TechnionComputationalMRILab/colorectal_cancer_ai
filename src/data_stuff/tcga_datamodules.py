@@ -130,7 +130,9 @@ class TcgaDataModule(pl.LightningDataModule):
             batch_size: int = 64,
             num_workers: int = 8,
             fast_subset: bool = True,
-            custom_dataset: bool = False):
+            min_patches_per_patient: int = 0):
+            # custom_dataset: bool = False):
+
         super().__init__()
         self.data_dir = data_dir
         self.train_dir = self.data_dir + 'train'
@@ -138,7 +140,8 @@ class TcgaDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.fast_subset = fast_subset
-        self.custom_dataset = custom_dataset
+        self.min_patches_per_patient = min_patches_per_patient
+        # self.custom_dataset = custom_dataset
 
     def prepare_data(self):
         # things to do on 1 gpu
@@ -160,7 +163,7 @@ class TcgaDataModule(pl.LightningDataModule):
     def setup(self, stage):
         # things to do on every accelerator (distibuted mode)
         # splits, etc
-        if self.custom_dataset:
+        if self.min_patches_per_patient>0:
             self.train_ds = CustomTcgaDataset(self.train_dir, self.train_transforms, min_patches_per_patient=8)
             self.val_ds   = CustomTcgaDataset(self.val_dir, self.val_transforms,min_patches_per_patient=8)
         else:

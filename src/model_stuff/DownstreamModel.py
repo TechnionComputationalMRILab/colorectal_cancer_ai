@@ -68,6 +68,7 @@ class MyDownstreamModel(LightningModule):
         # so I need to split this into 2 after extracting features.
         # Then I can concat them and run through the linear head.
         # so need to split after extracting features 
+        # import pdb; pdb.set_trace()
         x = self.extract_features(x)
         x = torch.stack(torch.split(x, self.dataloader_group_size)).flatten(1) # bs x features
         x = self.fc(x)
@@ -92,7 +93,7 @@ class MyDownstreamModel(LightningModule):
         if self.log_everything:
             self.log("train_loss", loss, on_step=True, on_epoch=True)
             self.log('train_acc', acc, on_step=True, on_epoch=True)
-        return {"loss": loss, "acc_downstream": acc}
+        return {"loss": loss, "acc_downstream": acc, "batch_outputs": out.clone().detach()}
 
     def validation_step(self, batch, batch_idx):
         y = batch["label"]
@@ -114,7 +115,8 @@ class MyDownstreamModel(LightningModule):
         del batch
 
         #, "batch_outputs_downstream": out.clone().detach()}
-        return {"val_loss_downstream": val_loss.detach(), "val_acc_downstream": val_acc.detach()}
+        return {"val_loss_downstream": val_loss.detach(), "val_acc_downstream": val_acc.detach(), "batch_outputs": out.clone().detach()}
+
 
     def training_epoch_end(self, training_step_outputs):
         train_loss_downstream = []

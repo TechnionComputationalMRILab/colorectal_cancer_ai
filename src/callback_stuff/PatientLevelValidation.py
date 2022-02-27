@@ -6,23 +6,54 @@ import torch
 import torchmetrics
 
 class PatientLevelValidation(pl.Callback):
-    def __init__(self) -> None:
+    def __init__(self, multi_patch: bool = False) -> None:
 
         print("Patient Level Eval initialized")
 
         self.train_patient_eval_dict = defaultdict(list)
         self.val_patient_eval_dict = defaultdict(list)
         self.all_patient_targets = {}
+        self.multi_patch = multi_patch
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
-        paths, x, y = batch
-        batch_outputs = outputs["batch_outputs"]
-        self.patient_eval(paths, batch_outputs, y, 'train')
+        if not self.multi_patch:
+            paths, x, y = batch
+            batch_outputs = outputs["batch_outputs"]
+            self.patient_eval(paths, batch_outputs, y, 'train')
+        else: # self.multi_patch is True
+            paths = batch["data_paths"] # vector 32x1 len(paths[n]) = 8
+            x = batch["data"] # 32x8x224x3 
+            y = batch["label"] # 32x8
+            batch_outputs = outputs["batch_outputs"]
+
+            # unroll all into bsxgs = 32x8 = 256
+            group_sz = len(paths[0].split(',')) # 8 in this case
+            paths = [item for sublist in paths for item in sublist.split(',')]
+            y = y.repeat_interleave(group_sz)
+            patch_batch_outputs = batch_outputs.repeat_interleave(group_sz, axis=0)
+            self.patient_eval(paths, patch_batch_outputs, y, 'train')
+
+
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
-        paths, x, y = batch
-        batch_outputs = outputs["batch_outputs"]
-        self.patient_eval(paths, batch_outputs, y, 'val')
+        if not self.multi_patch:
+            paths, x, y = batch
+            batch_outputs = outputs["batch_outputs"]
+            self.patient_eval(paths, batch_outputs, y, 'val')
+        else: # self.multi_patch is True
+            paths = batch["data_paths"] # vector 32x1
+            x = batch["data"] # 32x8x224x3 
+            y = batch["label"] # 32x8
+            batch_outputs = outputs["batch_outputs"] #32x2
+
+            # unroll all into bsxgs = 32x8 = 256
+            group_sz = len(paths[0].split(',')) # 8 in this case
+            paths = [item for sublist in paths for item in sublist.split(',')]
+            y = y.repeat_interleave(group_sz)
+            patch_batch_outputs = batch_outputs.repeat_interleave(group_sz, axis=0)
+            self.patient_eval(paths, patch_batch_outputs, y, 'val')
+
+
 
     def patient_eval(self, batch_paths, batch_scores, batch_targets, train_or_val: str):
         """
@@ -34,7 +65,6 @@ class PatientLevelValidation(pl.Callback):
         # matches look like:
         # [['/MSS/', 'TCGA-AZ-5403'],... ['/MSIMUT/', 'TCGA-CM-6674']]
         status_patient_regex = [re.findall(path_pattern, path) for path in batch_paths]
-        
         with torch.no_grad():
             for i in zip(status_patient_regex, batch_scores, batch_targets):
                 status_patient, score, target = i
@@ -44,8 +74,9 @@ class PatientLevelValidation(pl.Callback):
                 
                 # check if all_patient_targets is consistent
                 # if self.current_epoch == 0:
+                import pdb; # pdb.set_trace()
                 if patient in self.all_patient_targets:
-                    assert self.all_patient_targets[patient] == target, f"targets not consistent for patient: {patient}"
+                    assert self.all_patient_targets[patient] == target, pdb.set_trace()# ; f"targets not consistent for patient: {patient}"
                 else:
                     self.all_patient_targets[patient] = target
 

@@ -12,7 +12,7 @@ from PIL import Image
 
 class DownstreamTrainingDataset(torch.utils.data.Dataset):
 
-    def __init__(self, root_dir, transform=None, dataset_type="train", group_size=5, subset_size=None):
+    def __init__(self, root_dir, transform=None, dataset_type="train", group_size=5, subset_size=None, min_patches_per_patient=0):
         """
         Args:
             root_dir (sting): Directory with all the data (eg '/tcmldrive/databases/Public/TCGA/data/')
@@ -24,6 +24,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         self.subset_size = subset_size
         self.transform = transform
         self.group_size = group_size
+        self.min_patches_per_patient = min_patches_per_patient
         self.classes = ["MSIMUT", "MSS"] #eventually make this inferred from folders
         self.class_to_idx = {"MSIMUT":0, "MSS":1}
         self.dataset_type = dataset_type
@@ -33,6 +34,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         self.all_filenames = self.get_all_file_paths()
         self.ultimate_re = r'train|test|TCGA-\w{2}-\w{4}|/MSIMUT/|/MSS/'
         self.dataset_dict_tcga = self.make_dataset_dict()
+        self.remove_patients_with_less_than_min_patches()
         self.check_dataset_dict(self.dataset_dict_tcga)
         self.index_mapping = self.__create_index_mapping__()
         print('\t... done initialization ✅')
@@ -62,7 +64,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
                         train_index_mapping.append({
                             "label": self.class_to_idx[class_label], 
                             "patient_id": [patient_id]*self.group_size, 
-                            "data_paths": group 
+                            "data_paths": ','.join(group)
                             })
 
         if self.subset_size is not None:
@@ -72,6 +74,24 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
             train_index_mapping = random.sample(train_index_mapping, new_size)
 
         return train_index_mapping
+
+    def remove_patients_with_less_than_min_patches(self):
+
+        # first find patients that dont have enough patches
+        bad_patients = []
+        for cls in self.classes:
+            for patient_id in self.dataset_dict_tcga[self.dataset_type][cls]:
+                if len(self.dataset_dict_tcga[self.dataset_type][cls][patient_id]) < self.min_patches_per_patient:
+                    bad_patients.append((cls, patient_id, len(self.dataset_dict_tcga[self.dataset_type][cls][patient_id])))
+
+        # now get rid of them
+        print(f"Removing these patients: {bad_patients}")
+        print(f"\t train dict size before: {len(self.dataset_dict_tcga[self.dataset_type][cls])}")
+        for cls, patient, num_patches in bad_patients:
+            print(f"\t --- removing: {self.dataset_dict_tcga[self.dataset_type][cls].pop(patient)}")
+        print(f"\t train dict size after: {len(self.dataset_dict_tcga[self.dataset_type][cls])}")
+        print("... patients removed")
+
             
 
     def __getitem__(self, idx):
@@ -87,7 +107,7 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         # replace paths in patient set with torch tensor of all the patches
         # tensor should be (NxWxHxC)) where n is batch size (in this case it is self.group_size)
         patches = []
-        for path in patient_set['data_paths']:
+        for path in patient_set['data_paths'].split(','):
             patch = Image.open(path)
             patch = self.transform(patch).permute(1, 2, 0) #C,W,H->W,H,C
             patches.append(patch)
@@ -156,6 +176,11 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
                 data_dict[data_set][data_class][patient_id].append(path)
             else:
                 data_dict[data_set][data_class][patient_id] = [path]
+        
+        # now remove all the patients that have less than n patches/files
+        # if self.min_patches_per_patient > 0:
+        #     for 
+        #     import pdb; pdb.set_trace()
         return data_dict
 
     def check_dataset_dict(self, dataset_dict):
