@@ -75,6 +75,35 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
 
         return train_index_mapping
 
+
+    def __getitem__(self, idx):
+        # idk why I need dis
+        # may be required to make compatible with random split
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        # looks like {'label': 'MSIMUT', 
+        #               'patient_id': 'TCGA-CM-6171', 
+        #               'data_paths': ('/workspace/repos/TCGA/data/train/MSIMUT/blk-THPNGVSFMQPH-TCGA-CM-6171-01Z-00-DX1.png', ... }
+        patient_set = self.index_mapping[idx]
+
+        # replace paths in patient set with torch tensor of all the patches
+        # tensor should be (NxWxHxC)) where n is batch size (in this case it is self.group_size)
+        patches = []
+        for path in patient_set['data_paths'].split(','):
+            # for path in patient_set['data_paths']:
+            patch = Image.open(path)
+            patch = self.transform(patch).permute(1, 2, 0) #C,W,H->W,H,C
+            patches.append(patch)
+        patches_stack = torch.stack(patches)
+        # patient_set["data"] = patches_stack
+        x = patches_stack
+        y = patient_set["label"]
+        paths = patient_set["data_paths"]
+        return paths, x, y
+        # return patient_set['label'], patient_set['patient_id'], patient_set['data_paths'], patient_set['data']
+
+
     def remove_patients_with_less_than_min_patches(self):
 
         # first find patients that dont have enough patches
@@ -91,30 +120,6 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
             print(f"\t --- removing: {self.dataset_dict_tcga[self.dataset_type][cls].pop(patient)}")
         print(f"\t train dict size after: {len(self.dataset_dict_tcga[self.dataset_type][cls])}")
         print("... patients removed")
-
-            
-
-    def __getitem__(self, idx):
-        # idk why I need dis
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
-        # looks like {'label': 'MSIMUT', 
-        #               'patient_id': 'TCGA-CM-6171', 
-        #               'data_paths': ('/workspace/repos/TCGA/data/train/MSIMUT/blk-THPNGVSFMQPH-TCGA-CM-6171-01Z-00-DX1.png', ... }
-        patient_set = self.index_mapping[idx]
-
-        # replace paths in patient set with torch tensor of all the patches
-        # tensor should be (NxWxHxC)) where n is batch size (in this case it is self.group_size)
-        patches = []
-        for path in patient_set['data_paths'].split(','):
-            patch = Image.open(path)
-            patch = self.transform(patch).permute(1, 2, 0) #C,W,H->W,H,C
-            patches.append(patch)
-        patches_stack = torch.stack(patches)
-        patient_set["data"] = patches_stack
-        return patient_set
-        # return patient_set['label'], patient_set['patient_id'], patient_set['data_paths'], patient_set['data']
 
 
     def get_train_sample_filenames(self):

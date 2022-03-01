@@ -21,9 +21,10 @@ class PatientLevelValidation(pl.Callback):
             batch_outputs = outputs["batch_outputs"]
             self.patient_eval(paths, batch_outputs, y, 'train')
         else: # self.multi_patch is True
-            paths = batch["data_paths"] # vector 32x1 len(paths[n]) = 8
-            x = batch["data"] # 32x8x224x3 
-            y = batch["label"] # 32x8
+            paths, x, y = batch
+            # paths is vector 32x1 len(paths[n]) = 8
+            # x is  32x8x224x3 
+            # y is  32x8
             batch_outputs = outputs["batch_outputs"]
 
             # unroll all into bsxgs = 32x8 = 256
@@ -34,16 +35,16 @@ class PatientLevelValidation(pl.Callback):
             self.patient_eval(paths, patch_batch_outputs, y, 'train')
 
 
-
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
         if not self.multi_patch:
             paths, x, y = batch
             batch_outputs = outputs["batch_outputs"]
             self.patient_eval(paths, batch_outputs, y, 'val')
         else: # self.multi_patch is True
-            paths = batch["data_paths"] # vector 32x1
-            x = batch["data"] # 32x8x224x3 
-            y = batch["label"] # 32x8
+            paths, x, y = batch
+            # paths is vector 32x1 len(paths[n]) = 8
+            # x is  32x8x224x3 
+            # y is  32x8
             batch_outputs = outputs["batch_outputs"] #32x2
 
             # unroll all into bsxgs = 32x8 = 256
