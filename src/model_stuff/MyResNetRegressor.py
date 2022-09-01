@@ -8,18 +8,18 @@ import torchvision.models as models
 import torchmetrics
 
 class MyResNet(LightningModule):
-    def __init__(self, num_classes=2):
+    def __init__(self, num_classes=2, weight_decay=None):
         super().__init__()
         self.save_hyperparameters()
+        self.weight_decay = weight_decay
 
         resnet = models.resnet18(pretrained=True)
         self.backbone = torch.nn.Sequential(*(list(resnet.children())[:-1])) # just remove the fc
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(512, self.hparams.num_classes),
+            torch.nn.Linear(512, 1),
             # torch.nn.Sigmoid(),
         )
         self.criteria = torch.nn.BCEWithLogitsLoss()
-        # self.criteria = torch.nn.BCELoss()
 
     def extract_features(self, x):
         x = self.backbone(x)
@@ -40,8 +40,9 @@ class MyResNet(LightningModule):
         x = x.view(x.shape[0]*x.shape[1], x.shape[2], x.shape[3], x.shape[4])
         out = self(x)
 
-        loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
-        acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
+        loss = self.criteria(out.squeeze(-1), y.float())
+        out_binarized = (torch.nn.functional.sigmoid(out) > 0.5).type(torch.uint8)
+        acc = torchmetrics.functional.accuracy(out_binarized, y)
         
         self.log('train_loss', loss, on_step=True, on_epoch=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True)
@@ -58,14 +59,14 @@ class MyResNet(LightningModule):
         out = self(x)
         
         # import pdb; pdb.set_trace()
-        val_loss = self.criteria(out, torch.nn.functional.one_hot(y, self.hparams.num_classes).float())
-        val_acc = torchmetrics.functional.accuracy(torch.argmax(out, dim=1), y)
+        val_loss = self.criteria(out.squeeze(-1), y.float())
+        out_binarized = (torch.nn.functional.sigmoid(out) > 0.5).type(torch.uint8)
+        val_acc = torchmetrics.functional.accuracy(out_binarized, y)
         
         self.log('val_loss', val_loss, on_step=True, on_epoch=True)
         self.log('val_acc', val_acc, on_step=True, on_epoch=True)
         val_loss = val_loss.unsqueeze(dim=-1)
         return {"val_loss": val_loss, "val_acc": val_acc, "batch_outputs": out.clone().detach()}
-
 
     def get_preds(self, batch):
         img_id, img_paths, y, x = batch
@@ -80,4 +81,9 @@ class MyResNet(LightningModule):
     # print(f"REGULAR val loss: {val_loss} | val acc: {val_acc}")
                 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-3)
+        if self.weight_decay:
+            print(f"DOING WEIGHT DECAY {self.weight_decay}")
+            return torch.optim.Adam(self.parameters(), lr=1e-3, weight_decay=self.weight_decay)
+        else:
+            print(" DOING LEARNING RATE 1e-4!!!")
+            return torch.optim.Adam(self.parameters(), lr=1e-4)

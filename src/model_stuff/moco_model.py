@@ -5,15 +5,21 @@ import torch
 import numpy as np
 import copy
 
+from src.model_stuff.MyResNet import MyResNet
+
 class MocoModel(pl.LightningModule):
-    def __init__(self, memory_bank_size, moco_max_epochs=None):
+    def __init__(self, memory_bank_size, moco_max_epochs=None, backbone="lightly"):
         super().__init__()
         
         # need for cosine annealing
         self.moco_max_epochs = moco_max_epochs
 
         # create a ResNet backbone and remove the classification head
-        resnet = lightly.models.ResNetGenerator('resnet-18', 1, num_splits=8)
+
+        if backbone=="lightly":
+            resnet = lightly.models.ResNetGenerator('resnet-18', 1, num_splits=8)
+        elif backbone=="torch":
+            resnet = MyResNet()
         backbone = nn.Sequential(
             *list(resnet.children())[:-1],
             nn.AdaptiveAvgPool2d(1),
@@ -53,5 +59,3 @@ class MocoModel(pl.LightningModule):
                                 momentum=0.9, weight_decay=5e-4)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, self.moco_max_epochs)
         return [optim], [scheduler]
-
-

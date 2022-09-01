@@ -17,24 +17,25 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         Args:
             root_dir (sting): Directory with all the data (eg '/tcmldrive/databases/Public/TCGA/data/')
             transform (callable, optional): Optional transform to be applied on a sample.
-            dataset_type (string): "train" or "test"
-            subset_size: percentage of dataset I want to use (implemented due to memory restrictions)
+            dataset_type (string): "train" or "val"
+            subset_size: percentage of dataset I want to use (implemented dueto memory restrictions)
         """
         print('\tInitializing Downstream Training Dataset...')
         self.subset_size = subset_size
         self.transform = transform
         self.group_size = group_size
         self.min_patches_per_patient = min_patches_per_patient
-        self.classes = ["MSIMUT", "MSS"] #eventually make this inferred from folders
-        self.class_to_idx = {"MSIMUT":0, "MSS":1}
+        self.classes = ["dog", "fish"] #eventually make this inferred from folders
+        self.class_to_idx = {"dog":0, "fish":1}
         self.dataset_type = dataset_type
         self.root_dir = root_dir
         self.train_dir = root_dir + 'train'
-        self.val_dir = root_dir + 'test'
+        self.val_dir = root_dir + 'val'
         self.all_filenames = self.get_all_file_paths()
-        self.ultimate_re = r'train|test|TCGA-\w{2}-\w{4}|/MSIMUT/|/MSS/'
+        # self.ultimate_re = r'train|val|TCGA-\w{2}-\w{4}|/fish/|/dog/'
+        self.ultimate_re = r'train|val|img[\d{1}]+|/fish/|/dog/'
         self.dataset_dict_tcga = self.make_dataset_dict()
-        self.remove_patients_with_less_than_min_patches()
+        # self.remove_patients_with_less_than_min_patches()
         self.check_dataset_dict(self.dataset_dict_tcga)
         self.index_mapping = self.__create_index_mapping__()
         print('\t... done initialization ✅')
@@ -82,9 +83,9 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        # looks like {'label': 'MSIMUT', 
+        # looks like {'label': 'fish', 
         #               'patient_id': 'TCGA-CM-6171', 
-        #               'data_paths': ('/workspace/repos/TCGA/data/train/MSIMUT/blk-THPNGVSFMQPH-TCGA-CM-6171-01Z-00-DX1.png', ... }
+        #               'data_paths': ('/workspace/repos/TCGA/data/train/fish/blk-THPNGVSFMQPH-TCGA-CM-6171-01Z-00-DX1.jpg', ... }
         patient_set = self.index_mapping[idx]
 
         # replace paths in patient set with torch tensor of all the patches
@@ -124,21 +125,21 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
 
     def get_train_sample_filenames(self):
         """ filenames for all images in train dir"""
-        train_img_filenames_MSIMUT = glob.glob(self.train_dir+'/MSIMUT/*.png')
-        train_img_filenames_MSS = glob.glob(self.train_dir+'/MSS/*.png')
-        all_train_filenames = train_img_filenames_MSIMUT + train_img_filenames_MSS
+        train_img_filenames_fish = glob.glob(self.train_dir+'/fish/*.jpg')
+        train_img_filenames_dog = glob.glob(self.train_dir+'/dog/*.jpg')
+        all_train_filenames = train_img_filenames_fish + train_img_filenames_dog
         return all_train_filenames
 
     def get_val_sample_filenames(self):
         """ filenames for all images in val dir"""
-        test_img_filenames_MSIMUT = glob.glob(self.val_dir+'/MSIMUT/*.png')
-        test_img_filenames_MSS = glob.glob(self.val_dir+'/MSS/*.png')
-        all_val_filenames = test_img_filenames_MSIMUT + test_img_filenames_MSS
+        val_img_filenames_fish = glob.glob(self.val_dir+'/fish/*.jpg')
+        val_img_filenames_dog = glob.glob(self.val_dir+'/dog/*.jpg')
+        all_val_filenames = val_img_filenames_fish + val_img_filenames_dog
         return all_val_filenames
 
     def get_all_file_paths(self):
         """
-        EX: ['/workspace/repos/TCGA/data/train/MSIMUT/blk-LISQHHKHDTVS-TCGA-CM-6171-01Z-00-DX1.png', ...]
+        EX: ['/workspace/repos/TCGA/data/train/fish/blk-LISQHHKHDTVS-TCGA-CM-6171-01Z-00-DX1.png', ...]
         length is 192312
         """
         all_filenames = self.get_train_sample_filenames() + self.get_val_sample_filenames()
@@ -146,8 +147,8 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
 
     def get_set_class_patientid(self, path):
         """
-        This function will return the set (train/val), class(MSS/MSIMUT), and patientid for a path.
-        EX: '/workspace/repos/TCGA/data/train/MSIMUT/blk-LISQHHKHDTVS-TCGA-CM-6171-01Z-00-DX1.png' -> ['train', '/MSIMUT/', 'TCGA-CM-6171']
+        This function will return the set (train/val), class(dog/fish), and patientid for a path.
+        EX: '/workspace/repos/TCGA/data/train/fish/blk-LISQHHKHDTVS-TCGA-CM-6171-01Z-00-DX1.png' -> ['train', '/fish/', 'TCGA-CM-6171']
         """
         matches = re.findall(self.ultimate_re, path)
         assert(len(matches)==3), f"There are {len(matches)} matches, but it should be 3"
@@ -161,22 +162,21 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         """
         data_dict = {
                 "train": {
-                    "MSS": {
+                    "dog": {
                         # patient_id: [],
                         # patient_id: [],
                         # ...
                         },
-                    "MSIMUT": {}
+                    "fish": {}
                     },
-                "test": {
-                    "MSS": {},
-                    "MSIMUT": {}
+                "val": {
+                    "dog": {},
+                    "fish": {}
                     }
                 }
-
         for i, path in enumerate(self.all_filenames):
             data_set, data_class, patient_id = self.get_set_class_patientid(path)
-            data_class = data_class.replace('/', '') # remove "/" (/MSS/ -> MSS)
+            data_class = data_class.replace('/', '') # remove "/" (/dog/ -> dog)
             if patient_id in data_dict[data_set][data_class].keys():
                 data_dict[data_set][data_class][patient_id].append(path)
             else:
@@ -185,18 +185,18 @@ class DownstreamTrainingDataset(torch.utils.data.Dataset):
         # now remove all the patients that have less than n patches/files
         # if self.min_patches_per_patient > 0:
         #     for 
-        #     import pdb; pdb.set_trace()
         return data_dict
 
     def check_dataset_dict(self, dataset_dict):
-        mss_train_num_patients = len(dataset_dict["train"]["MSS"])
-        msimut_train_num_patients = len(dataset_dict["train"]["MSIMUT"])
-        mss_test_num_patients = len(dataset_dict["test"]["MSS"])
-        msimut_test_num_patients = len(dataset_dict["test"]["MSIMUT"])
+        mss_train_num_patients = len(dataset_dict["train"]["dog"])
+        msimut_train_num_patients = len(dataset_dict["train"]["fish"])
+        mss_val_num_patients = len(dataset_dict["val"]["dog"])
+        msimut_val_num_patients = len(dataset_dict["val"]["fish"])
         f_str = (f"\n\t---\n"
                 f"\tnum train mss patients      : {mss_train_num_patients}\n"
-                f"\tnum test mss patients       : {mss_test_num_patients}\n"
+                f"\tnum val mss patients       : {mss_val_num_patients}\n"
                 f"\tnum train msimut patients   : {msimut_train_num_patients}\n"
-                f"\tnum test msimut patients   : {msimut_test_num_patients}\n"
+                f"\tnum val msimut patients   : {msimut_val_num_patients}\n"
                 f"\t---\n")
         print(f_str)
+ 

@@ -10,14 +10,21 @@ from pytorch_lightning import LightningModule, Trainer
 import torchvision.models as models
 import torchmetrics
 
-from ..data_stuff import dataset_tools
+# FOR TESTING IF MY RESNET IS BETTER #
+from src.model_stuff.MyResNet import MyResNet
+
 import re
 
 class MyDownstreamModel(LightningModule):
-    def __init__(self, backbone, num_classes=2, logger=None, dataloader_group_size=6, log_everything=False):
+    def __init__(self, backbone, max_epochs, lr=1e-4, num_classes=2, logger=None, dataloader_group_size=6, log_everything=False, freeze_backbone=True):
         super().__init__()
         self.num_classes=num_classes
         self.log_everything = log_everything
+        self.lr = lr
+        # self.fe = fe # CAN BE lightly or myresnet
+        # self.use_dropout = use_dropout
+        # self.num_FC = num_FC
+        # self.use_LRa = use_LRa
         # self.save_hyperparameters()
 
         # just pass the feature extractor
@@ -25,19 +32,82 @@ class MyDownstreamModel(LightningModule):
         self.feature_extractor = copy.deepcopy(backbone)
         self.dataloader_group_size=dataloader_group_size
         self.parent_logger = logger
-        self.tensorboard_exp = self.parent_logger.experiment
+        # self.tensorboard_exp = self.parent_logger.experiment
 
         # freeze all parameters in feature extractor
-        for p in self.feature_extractor.parameters():
-            p.requires_grad = False
+        if freeze_backbone:
+            print("... freezing moco backbone ...")
+            for p in self.feature_extractor.parameters():
+                p.requires_grad = False
 
         # trainable params
-        in_dim = 512*self.dataloader_group_size
-        self.fc = torch.nn.Sequential(
-            torch.nn.Linear(in_dim, 1024),
-            torch.nn.Linear(1024, self.num_classes),
-            # torch.nn.Sigmoid(),
-        )
+        in_dim = 512
+        num_channels = self.dataloader_group_size
+        self.c_blk = torch.nn.Sequential(
+                torch.nn.Conv1d(in_channels=num_channels, out_channels=num_channels*2, kernel_size=5, stride=2),
+                # torch.nn.BatchNorm1d(num_channels*2),
+                torch.nn.ReLU(),
+                torch.nn.Conv1d(in_channels=num_channels*2, out_channels=num_channels, kernel_size=3, stride=2),
+                # torch.nn.BatchNorm1d(num_channels),
+                torch.nn.ReLU(),
+                torch.nn.MaxPool1d(kernel_size=2),
+                )
+        if self.dataloader_group_size == 4:
+            self.fc = torch.nn.Sequential(
+                    torch.nn.Linear(252, 252),
+                    torch.nn.Linear(252, self.num_classes),
+                    )
+        elif self.dataloader_group_size == 8:
+            self.fc = torch.nn.Sequential(
+                    # torch.nn.Linear(504, 504),
+                    torch.nn.Linear(504, self.num_classes),
+                    )
+        elif self.dataloader_group_size == 16:
+            self.fc = torch.nn.Sequential(
+                    # torch.nn.Linear(1008, 1008),
+                    torch.nn.Linear(1008, self.num_classes),
+                    )
+        elif self.dataloader_group_size == 32:
+            self.fc = torch.nn.Sequential(
+                    # torch.nn.Linear(2016, 256),
+                    torch.nn.Linear(2016, self.num_classes),
+                    )
+        # elif self.dataloader_group_size == 2:
+        #     self.fc = torch.nn.Sequential(
+        #             torch.nn.Linear(126, 126),
+        #             torch.nn.Linear(126, self.num_classes),
+        #             )
+        # elif self.dataloader_group_size == 3:
+        #     self.fc = torch.nn.Sequential(
+        #             torch.nn.Linear(189, 189),
+        #             torch.nn.Linear(189, self.num_classes),
+        #             )
+        # in_dim = 512*self.dataloader_group_size
+        # if self.use_dropout and self.num_FC==2:
+        #     self.fc = torch.nn.Sequential(
+        #         torch.nn.Dropout(0.6),
+        #         torch.nn.Linear(in_dim, 512),
+        #         torch.nn.Dropout(0.6),
+        #         torch.nn.Linear(512, self.num_classes),
+        #         # torch.nn.Sigmoid(),
+        #     )
+        # elif (not self.use_dropout and self.num_FC==2):
+        #     self.fc = torch.nn.Sequential(
+        #         # torch.nn.Dropout(0.6),
+        #         torch.nn.Linear(in_dim, 512),
+        #         # torch.nn.Dropout(0.6),
+        #         torch.nn.Linear(512, self.num_classes),
+        #         # torch.nn.Sigmoid(),
+        #     )
+        # elif self.num_FC==1:
+        #     self.fc = torch.nn.Sequential(
+        #         torch.nn.Linear(in_dim, self.num_classes),
+        #     )
+
+
+        
+
+
         self.criteria = torch.nn.BCEWithLogitsLoss()
         # self.criteria = torch.nn.BCELoss()
 
@@ -61,29 +131,19 @@ class MyDownstreamModel(LightningModule):
         return x
 
     def forward(self, x):
-        # WARNING: this is hacky
-        # so x is a vector like this [10x3x224x224]
-        # but 10 is actually batch_size*group_size
-        # so in this case, group_size is 5 and batch size is 2
-        # so I need to split this into 2 after extracting features.
-        # Then I can concat them and run through the linear head.
-        # so need to split after extracting features 
-        # import pdb; pdb.set_trace()
         x = self.extract_features(x)
-        x = torch.stack(torch.split(x, self.dataloader_group_size)).flatten(1) # bs x features
+        
+        # x = torch.stack(torch.split(x, self.dataloader_group_size)).flatten(1) # bs x features
+        x = torch.stack(torch.split(x, self.dataloader_group_size)) # bs x gs x features
+        x = self.c_blk(x)
+        x = torch.flatten(x, 1)
         x = self.fc(x)
         return x
 
     def training_step(self, batch, batch_idx):
-        paths, x, y = batch
-        # y =group
-        # y = list(zip(*batch["label"]))
-        # y = torch.Tensor([item for sublist in y for item in sublist]).long().to(self.device) # flatten y from list of tuples
-        # patient_ids = batch["patient_id"]
-        # data_paths = batch["data_paths"]
-        # data_shape = batch["data"].shape
-        data_shape = x.shape
-        x = x.view(data_shape[0]*data_shape[1], data_shape[-1], *data_shape[2:4])
+        img_id, img_paths, y, x = batch
+        x = x.view(x.shape[0]*x.shape[1], *x.shape[2:])
+        # x = x.view(data_shape[0]*data_shape[1], data_shape[-1], *data_shape[2:4])
         
         out = self(x)
 
@@ -98,15 +158,8 @@ class MyDownstreamModel(LightningModule):
         return {"loss": loss, "acc_downstream": acc, "batch_outputs": out.clone().detach()}
 
     def validation_step(self, batch, batch_idx):
-        paths, x, y = batch
-        # y = batch["label"]
-        # y = list(zip(*batch["label"])) # list of tuples
-        # y = torch.Tensor([item for sublist in y for item in sublist]).long().to(self.device) # flatten y from list of tuples
-        # patient_ids = batch["patient_id"]
-        # data_paths = batch["data_paths"]
-        # data_shape = batch["data"].shape
-        data_shape = x.shape
-        x = x.view(data_shape[0]*data_shape[1], data_shape[-1], *data_shape[2:4])
+        img_id, img_paths, y, x = batch
+        x = x.view(x.shape[0]*x.shape[1], *x.shape[2:])
 
         out = self(x)
 
@@ -120,6 +173,13 @@ class MyDownstreamModel(LightningModule):
 
         #, "batch_outputs_downstream": out.clone().detach()}
         return {"val_loss_downstream": val_loss.detach(), "val_acc_downstream": val_acc.detach(), "batch_outputs": out.clone().detach()}
+
+    def get_preds(self, batch):
+        img_id, img_paths, y, x = batch
+        x = x.view(x.shape[0]*x.shape[1], *x.shape[2:])
+        x = x.to(self.device)
+        out = self(x)
+        return out
 
 
     def training_epoch_end(self, training_step_outputs):
@@ -149,5 +209,5 @@ class MyDownstreamModel(LightningModule):
         self.downstream_val_accs.append(float(mean_val_acc))
         
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-4)
-    
+        optim = torch.optim.Adam(self.parameters(), self.lr)
+        return optim

@@ -4,11 +4,11 @@ import torch
 import torchvision
 
 # local imports
-from ..data_stuff import dataset_tools
+# from ..data_stuff import dataset_tools
 
 class MocoDataModule(pl.LightningDataModule):
     def __init__(self,
-            data_dir: str = "/workspace/repos/TCGA/data/",
+            data_dir: str = "/home/shatz/repos/data/imagenette_tesselated/",
             batch_size: int = 64,
             num_workers: int = 8,
             subset_size: float = None
@@ -77,21 +77,20 @@ class MocoDataModule(pl.LightningDataModule):
     #             )
     #     return val_dataloader
 
-    def get_class_to_idx_dict(self):
-        """
-        Returns something like {'MSIMUT': 0, 'MSS': 1}
-        I have to make a dummy dataset because setup() doesnt run in init(), so the self.train_ds
-        is not available at time of initialization :(. There are better ways of doing it but I dont
-        really care.
-        """
-        class_to_idx = dataset_tools.ImageFolderWithPaths(self.train_dir).class_to_idx
-        return class_to_idx
+    # def get_class_to_idx_dict(self):
+    #     """
+    #     Returns something like {'MSIMUT': 0, 'MSS': 1}
+    #     I have to make a dummy dataset because setup() doesnt run in init(), so the self.train_ds
+    #     is not available at time of initialization :(. There are better ways of doing it but I dont
+    #     really care.
+    #     """
+    #     class_to_idx = dataset_tools.ImageFolderWithPaths(self.train_dir).class_to_idx
+    #     return class_to_idx
 
-    def get_idx_to_class_dict(self):
-        """ 
-        Returns something like {0: 'MSIMUT', 1: 'MSS'} 
-        """
-        class_to_idx_dict = self.get_class_to_idx_dict() # {'MSIMUT': 0, 'MSS': 1}
-        idx_to_class_dict = {v: k for k, v in class_to_idx_dict.items()} # {0: 'MSIMUT', 1: 'MSS'}
-        return idx_to_class_dict
-
+    # def get_idx_to_class_dict(self):
+    #     """ 
+    #     Returns something like {0: 'MSIMUT', 1: 'MSS'} 
+    #     """
+    #     class_to_idx_dict = self.get_class_to_idx_dict() # {'MSIMUT': 0, 'MSS': 1}
+    #     idx_to_class_dict = {v: k for k, v in class_to_idx_dict.items()} # {0: 'MSIMUT', 1: 'MSS'}
+    #     return idx_to_class_dict

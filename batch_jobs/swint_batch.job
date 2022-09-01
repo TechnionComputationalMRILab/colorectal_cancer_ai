@@ -1,7 +1,0 @@
-#!/bin/bash
-
-#SBATCH --gpus=1
-
-#SBATCH --qos=normal 
-
-srun --container-image ~/nvidia+pytorch+21.11-py3.sqsh --container-mounts ~/repos/:/workspace/repos/ python /workspace/repos/colorectal_cancer_ai/SwinT_experiment.py

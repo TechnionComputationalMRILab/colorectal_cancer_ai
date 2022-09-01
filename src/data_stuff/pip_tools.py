@@ -8,3 +8,4 @@ def install(packages: list, quietly: bool=True):
         print("🤫 Installing packages quietly... shhh 🤫")
     subprocess.check_call(call_list)
     print("✅ Done installing packages")
+

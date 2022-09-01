@@ -1,134 +1,173 @@
-import pandas as pd
 from collections import defaultdict
 import pytorch_lightning as pl
-import re
 import torch
 import torchmetrics
+import numpy as np
+import pandas as pd
+import wandb
+from torchvision.utils import save_image
 
 class PatientLevelValidation(pl.Callback):
-    def __init__(self, multi_patch: bool = False) -> None:
+    def __init__(self, group_size: int, debug_mode = False) -> None:
 
-        print("Patient Level Eval initialized")
-
-        self.train_patient_eval_dict = defaultdict(list)
-        self.val_patient_eval_dict = defaultdict(list)
+        print(f"Patient Level Eval initialized with group size {group_size}")
+        # self.train_eval_dict = defaultdict(list)
+        # self.val_eval_dict = defaultdict(list)
         self.all_patient_targets = {}
-        self.multi_patch = multi_patch
+        self.group_size = group_size
+        self.debug_mode = debug_mode
+        self.MSIMUT_label = None
+
+    def setup(self, trainer, pl_module, stage=None):
+        # we need the following dicts to check for label corectness
+        self.train_samples_dict = trainer.datamodule.train_ds.get_samples_dict()
+        self.val_samples_dict = trainer.datamodule.val_ds.get_samples_dict()
+
+        try:
+            self.MSIMUT_label = trainer.datamodule.train_ds.class_to_idx["MSIMUT"]
+        except:
+            pass
+
+        # we need these dicts to fill with patch scores
+        self.train_img_samples_score_dict = trainer.datamodule.train_ds.get_img_samples_score_dict()
+        self.val_img_samples_score_dict = trainer.datamodule.val_ds.get_img_samples_score_dict()
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
-        if not self.multi_patch:
-            paths, x, y = batch
-            batch_outputs = outputs["batch_outputs"]
-            self.patient_eval(paths, batch_outputs, y, 'train')
-        else: # self.multi_patch is True
-            paths, x, y = batch
-            # paths is vector 32x1 len(paths[n]) = 8
-            # x is  32x8x224x3 
-            # y is  32x8
-            batch_outputs = outputs["batch_outputs"]
+        img_id, img_paths, y, x = batch
+        batch_outputs = outputs["batch_outputs"]
 
-            # unroll all into bsxgs = 32x8 = 256
-            group_sz = len(paths[0].split(',')) # 8 in this case
-            paths = [item for sublist in paths for item in sublist.split(',')]
-            y = y.repeat_interleave(group_sz)
-            patch_batch_outputs = batch_outputs.repeat_interleave(group_sz, axis=0)
-            self.patient_eval(paths, patch_batch_outputs, y, 'train')
+        # separate patch groups
+        if self.group_size > 1:
+            img_paths_lol = [p.split(",") for p in img_paths]
+            img_paths = [item for sublist in img_paths_lol for item in sublist]
+            y = y.repeat_interleave(self.group_size)
+            batch_outputs = batch_outputs.repeat_interleave(self.group_size, axis=0)
+            img_id = tuple(np.repeat(np.array(img_id), self.group_size))
+            if self.debug_mode:
+                for p in img_paths:
+                    if p == "/tcmldrive/tcga_data_formatted/train/MSS/TCGA-AF-6655/blk-YYDEFDMRGTTP-TCGA-AF-6655-01Z-00-DX1.png":
+                        # if p == "/tcmldrive/tcga_data_formatted/train/MSS/TCGA-SS-A7HO/blk-YFWIFFLIFPTE-TCGA-SS-A7HO-01Z-00-DX1.png":
+                        p_idx = img_paths.index(p)
+                        x = x.view(x.shape[0]*x.shape[1], *x.shape[2:])
+                        p_img = x[p_idx]
+                        # save_image(p_img, f"/home/shats/stupid_test/img_idx{p_idx}_r{np.random.randint(50)}.png")
+                        print("--- img saved@@@ ---")
+        elif self.group_size==1:
+            img_paths = list(img_paths[0])
+
+        self.update_dicts(img_id, img_paths, batch_outputs, y, self.train_img_samples_score_dict)
 
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused=0):
-        if not self.multi_patch:
-            paths, x, y = batch
-            batch_outputs = outputs["batch_outputs"]
-            self.patient_eval(paths, batch_outputs, y, 'val')
-        else: # self.multi_patch is True
-            paths, x, y = batch
-            # paths is vector 32x1 len(paths[n]) = 8
-            # x is  32x8x224x3 
-            # y is  32x8
-            batch_outputs = outputs["batch_outputs"] #32x2
+        img_id, img_paths, y, x = batch
+        batch_outputs = outputs["batch_outputs"]
 
-            # unroll all into bsxgs = 32x8 = 256
-            group_sz = len(paths[0].split(',')) # 8 in this case
-            paths = [item for sublist in paths for item in sublist.split(',')]
-            y = y.repeat_interleave(group_sz)
-            patch_batch_outputs = batch_outputs.repeat_interleave(group_sz, axis=0)
-            self.patient_eval(paths, patch_batch_outputs, y, 'val')
+        # separate patch groups
+        if self.group_size > 1:
+            img_paths_lol = [p.split(",") for p in img_paths]
+            img_paths = [item for sublist in img_paths_lol for item in sublist]
+            y = y.repeat_interleave(self.group_size)
+            batch_outputs = batch_outputs.repeat_interleave(self.group_size, axis=0)
+            img_id = tuple(np.repeat(np.array(img_id), self.group_size))
+        elif self.group_size==1:
+            img_paths = list(img_paths[0])
+
+        self.update_dicts(img_id, img_paths, batch_outputs, y, self.val_img_samples_score_dict)
 
 
-
-    def patient_eval(self, batch_paths, batch_scores, batch_targets, train_or_val: str):
+    def update_dicts(self, batch_img_ids, batch_paths, batch_scores, batch_targets, img_samples_score_dict):
         """
         Fill the patient eval dicts with patients & scores of current batch.
-        Please specify train_or_val with "train" or "val" batch.
-        """        
-        path_pattern = r'TCGA-\w{2}-\w{4}|/MSIMUT/|/MSS/'
-        
-        # matches look like:
-        # [['/MSS/', 'TCGA-AZ-5403'],... ['/MSIMUT/', 'TCGA-CM-6674']]
-        status_patient_regex = [re.findall(path_pattern, path) for path in batch_paths]
-        with torch.no_grad():
-            for i in zip(status_patient_regex, batch_scores, batch_targets):
-                status_patient, score, target = i
-                score = score.softmax(dim=-1)
-                status = status_patient[0]
-                patient = status_patient[1]
-                
-                # check if all_patient_targets is consistent
-                # if self.current_epoch == 0:
-                import pdb; # pdb.set_trace()
-                if patient in self.all_patient_targets:
-                    assert self.all_patient_targets[patient] == target, pdb.set_trace()# ; f"targets not consistent for patient: {patient}"
-                else:
-                    self.all_patient_targets[patient] = target
+        curr_dict is either the trianing dict that we want to fill or the validation dict (the one to update)
+        """
+        # ensure lengths are correct:
+        assert len(batch_paths) == len(batch_scores) and len(batch_scores) == len(batch_targets) and len(batch_img_ids) == len(batch_paths), (
+                f"\nError. lengths are not the same. lens: batch_paths-{len(batch_paths)}, batch_scores-{len(batch_scores)}, batch_targets-{len(batch_targets)}, batch_img_ids-{len(batch_img_ids)}\n")
 
-                if train_or_val == 'train':
-                    self.train_patient_eval_dict[patient].append(score)
-                elif train_or_val == 'val':
-                    self.val_patient_eval_dict[patient].append(score)
-                else:
-                    raise Exception('train_or_val can be either train or val yo!')
+        # fill dict
+        with torch.no_grad():
+            for img_id, patch_path, patch_score, patch_target in zip(batch_img_ids, batch_paths, batch_scores, batch_targets):
+                if img_samples_score_dict[img_id][patch_path] is not None:
+                    # import pdb; pdb.set_trace()
+                    if self.debug_mode:
+                        print(f"-- collision on patch {patch_path}")
+                img_samples_score_dict[img_id][patch_path] = patch_score
+
 
     def on_validation_epoch_end(self, trainer, pl_module):
         """ 
         Calculate Error on patient level and Clear the patient level eval dict(s),
         So that it can fill up for next epoch
-        """        
+        """
         # eval and record results
-        # need to loop over dicts to make this to ensure order is correct
-        # dicts dont necessarily enforce order
-        if len(self.train_patient_eval_dict) > 0:
-            train_patient_scores = []
-            train_patient_targets = []
-            for patient in self.train_patient_eval_dict.keys():
-                train_patient_score = sum(self.train_patient_eval_dict[patient])/len(self.train_patient_eval_dict[patient])
-                train_patient_score = train_patient_score.clone().detach()
-                train_patient_target = self.all_patient_targets[patient].clone().detach()
-                train_patient_scores.append(train_patient_score)
-                train_patient_targets.append(train_patient_target)
-            
-            train_patient_scores = torch.stack(train_patient_scores)
-            train_patient_targets = torch.stack(train_patient_targets)
-            train_loss = pl_module.criteria(train_patient_scores, torch.nn.functional.one_hot(train_patient_targets, num_classes=2).float())
-            train_acc = torchmetrics.functional.accuracy(torch.argmax(train_patient_scores, dim=1), train_patient_targets)
-            self.log('train_patientlvl_loss', train_loss)
-            self.log('train_patientlvl_acc', train_acc)
+        if not trainer.sanity_checking:
+            train_rawsum_acc, train_majority_vote_acc, train_percent_class_1 = self.score_dict(self.train_img_samples_score_dict, self.train_samples_dict)
+            val_rawsum_acc, val_majority_vote_acc, val_percent_class_1 = self.score_dict(self.val_img_samples_score_dict, self.val_samples_dict)
 
-        if len(self.val_patient_eval_dict) > 0:
-            val_patient_scores = []
-            val_patient_targets = []
-            for patient in self.val_patient_eval_dict.keys():
-                val_patient_score = sum(self.val_patient_eval_dict[patient])/len(self.val_patient_eval_dict[patient])
-                val_patient_score = val_patient_score.clone().detach()
-                val_patient_target = self.all_patient_targets[patient].clone().detach()
-                val_patient_scores.append(val_patient_score)
-                val_patient_targets.append(val_patient_target)
+            self.log('train_rawsum_acc', train_rawsum_acc, on_step=False, on_epoch=True)
+            self.log('train_majority_vote_acc', train_majority_vote_acc, on_step=False, on_epoch=True)
+            self.log('train_percent_class_MSIMUT', train_percent_class_1, on_step=False, on_epoch=True)
 
-            val_patient_scores = torch.stack(val_patient_scores)
-            val_patient_targets = torch.stack(val_patient_targets)
-            val_loss = pl_module.criteria(val_patient_scores, torch.nn.functional.one_hot(val_patient_targets, num_classes=2).float())
-            val_acc = torchmetrics.functional.accuracy(torch.argmax(val_patient_scores, dim=1), val_patient_targets)
-            self.log('val_patientlvl_loss', val_loss)
-            self.log('val_patientlvl_acc', val_acc)
+            self.log('val_rawsum_acc', val_rawsum_acc, on_step=False, on_epoch=True)
+            self.log('val_majority_vote_acc', val_majority_vote_acc, on_step=False, on_epoch=True)
+            self.log('val_percent_class_MSIMUT', val_percent_class_1, on_step=False, on_epoch=True)
 
-        self.train_patient_eval_dict = defaultdict(list)
-        self.val_patient_eval_dict = defaultdict(list)
+            # log dicts
+            # import pdb; pdb.set_trace()
+            # wandb.Table(dataframe=pd.DataFrame(self.train_samples_dict))
+
+        # refresh dicts
+        self.train_samples_dict = trainer.datamodule.train_ds.get_samples_dict()
+        self.val_samples_dict = trainer.datamodule.val_ds.get_samples_dict()
+        self.train_img_samples_score_dict = trainer.datamodule.train_ds.get_img_samples_score_dict()
+        self.val_img_samples_score_dict = trainer.datamodule.val_ds.get_img_samples_score_dict()
+
+
+    def score_dict(self, img_samples_score_dict, samples_dict, mode=None):
+        if self.debug_mode:
+            print(f"\n----------------- Debugging Patient-level Validation --------------------")
+        y = []
+        y_hat_rawsum = []
+        y_hat_majority_vote = []
+        for img_id in samples_dict.keys():
+            img_y = samples_dict[img_id][1]
+            patch_yhats = img_samples_score_dict[img_id]
+            img_yhat = []
+            img_yhat_none_count = 0 # just for error checking
+            for patch_path in patch_yhats:
+                if patch_yhats[patch_path] is not None:
+                    img_yhat.append(patch_yhats[patch_path])
+                else:
+                    img_yhat_none_count += 1
+            try:
+                img_yhat = torch.stack(img_yhat)
+            except:
+                import pdb; pdb.set_trace()
+            # img_yhat_rawsum_argmax = torch.argmax(img_yhat_rawsum_logits)
+            if img_yhat.shape[1] == 2:
+                img_yhat_rawsum_logits = torch.sum(img_yhat, dim=0)
+                img_yhat_majority_vote = torch.mode(torch.argmax(img_yhat, dim=1)).values
+            elif img_yhat.shape[1] == 1: ### REGRESSION CASE
+                img_yhat_rawsum_logits = torch.tensor(0) ### FIX THIS FOR REGRESSION CASE
+                # for the above, intuition says to sigmoid them, and then just check if average is greater or less than 0.5
+                img_yhat_majority_vote = torch.mode((torch.nn.functional.sigmoid(img_yhat)>0.5).type(torch.uint8).squeeze(-1)).values
+            else:
+                print("ERROR!!! NO fucking idea what is going on!")
+            y.append(img_y)
+            y_hat_rawsum.append(img_yhat_rawsum_logits)
+            y_hat_majority_vote.append(img_yhat_majority_vote)
+            if self.debug_mode:
+                print(f"Amount of nones for {img_id}: {img_yhat_none_count}")
+        y = torch.stack(y)
+        y_hat_rawsum = torch.stack(y_hat_rawsum)
+        y_hat_majority_vote = torch.stack(y_hat_majority_vote)
+
+        rawsum_acc = torchmetrics.functional.accuracy(y_hat_rawsum.cpu(), y)
+        majority_vote_acc = torchmetrics.functional.accuracy(y_hat_majority_vote.cpu(), y)
+        
+        percent_class_MSIMUT = sum(y_hat_majority_vote==self.MSIMUT_label)/len(y_hat_majority_vote)
+        # percent_class_MSIMUT = 1-sum(y_hat_majority_vote)/len(y_hat_majority_vote)
+
+        return rawsum_acc, majority_vote_acc, percent_class_MSIMUT
+
+
