@@ -2,9 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torchvision
-import matplotlib.pyplot as plt
 import copy
-import wandb
 
 from pytorch_lightning import LightningModule, Trainer
 import torchvision.models as models
