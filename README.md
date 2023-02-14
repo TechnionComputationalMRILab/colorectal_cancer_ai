@@ -1,7 +1,4 @@
-# 🚧 UNDER CONSTRUCTION 🚧
-
-
-## Detecting Colorectal Cancer MSI/MSS Status From High Resolution WSI with Deep Learning
+# Detecting Colorectal Cancer MSI/MSS Status From High Resolution WSI with Deep Learning
 This repo contains code used in the paper "Patient-level Microsatellite Stability Assessment from Whole Slide Images By Combining Momentum Contrast Learning and Group Patch Embeddings" by Shats et al. This paper will appear in the proceedings of the ECCV workshop on Medical Computer Vision (ECCV-MCV 2022). You can also read it on Arxiv [here](https://arxiv.org/abs/2208.10429). BibTeX citation below:
 ```
 @article{shats2022patient,
@@ -27,6 +24,39 @@ lightly
 ```
 
 ## Relevant Files
+
+### Data
+
+`src/data_stuff.sh` download the subset of TCGA used in our experiments.
+
+`src/data_stuff/convert_tcga_to_folders.py` converts the downloaded tcga data to folders in a hierarchy as follows:
+
+```
+train/
+--- MSS/
+--- --- patient1/
+--- --- --- patch1.png
+--- --- --- patch2.png
+--- --- --- ...
+--- --- patient2/
+--- --- --- patch1.png
+--- --- --- patch2.png
+--- --- --- ...
+--- --- ...
+--- MSIMUT/
+--- --- patient1/
+--- --- --- patch1.png
+--- --- --- patch2.png
+--- --- --- ...
+--- --- patient2/
+--- --- --- patch1.png
+--- --- --- patch2.png
+--- --- --- ...
+--- --- ...
+```
+
+### Training
+
 `resnet_experiment.py` trains the baseline approach that was used for comparison against our method. It is our implemenation of the work in [Kather et al](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7423299/).
 
 `moco_experiment.py` is used to train a patch feature extractor using [momentum contrast learning](https://arxiv.org/abs/2003.04297).
